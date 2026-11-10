@@ -13,9 +13,9 @@ The algorithms apply to **any moving object** — vessels, aircraft, vehicles,
 wildlife, pedestrians. The maritime data in the examples is one application,
 not the scope.
 
-**This release implements trajectory annotation.** The compression and
-prediction algorithms below are being added in later releases, each with its own
-app and tutorial.
+**This release implements trajectory annotation and CADP compression.** The
+other compression and prediction algorithms below are being added in later
+releases.
 
 ---
 
@@ -24,7 +24,7 @@ app and tutorial.
 | Algorithm | What it does | Paper | Status |
 |---|---|---|---|
 | **Annotation** | Attaches context observed at coarse resolution to high-frequency trajectory points. Spatial interpolation across observation stations, then temporal interpolation through time. | 2023 | **implemented** |
-| **CADP** | Context-Aware Douglas–Peucker. Extends DP with three context domains — environmental, internal, semantic — retaining points that carry contextual information a purely spatial criterion would discard. | 2025 | planned |
+| **CADP** | Context-Aware Douglas–Peucker. Extends DP with three context domains — environmental, internal, semantic — retaining points that carry contextual information a purely spatial criterion would discard. | 2025 | **implemented** |
 | **CPLS** | Context-aware Piecewise Linear Segmentation. Guarantees logical consistency, e.g., a compressed (simplified) vessel trajectory may not cross the shoreline. | 2021 | planned |
 | **2stage-CPLS** | CPLS plus stay-point preservation. | 2021 | planned |
 | **CLSTM** | Context-aware LSTM. Routes each trajectory to a per-type network, avoiding Simpson's paradox in a single global model. | 2021, 2023 | planned |
@@ -87,6 +87,26 @@ traj["wind_speed"] = annotate_points(
 Context attaches as ordinary columns, so it survives the `.iloc` slicing that
 trajectory compression performs — a compressed trajectory keeps the context of
 the points it retains.
+
+Compression then uses those columns. CADP runs Douglas–Peucker, then adds back
+every point whose removal would misrepresent a context variable by more than
+its threshold:
+
+```python
+from catraj.compression import compress, compression_ratio, dtw
+
+small = compress(
+    traj, epsilon=1_000,                          # metres, for Douglas–Peucker
+    thresholds={"wind_speed": 0.5, "speedoverg": 1.0},
+    time_column="t", by="sourcemmsi",             # or pass a movingpandas Trajectory
+)
+compression_ratio(len(small), len(traj)), dtw(traj, small)
+```
+
+`mode="post"` (the default) is the method as published: one pass against the
+Douglas–Peucker result. `mode="iterative"` re-measures after each addition, so
+every dropped point is guaranteed within its thresholds and far fewer points
+are kept; `help(catraj.compression.cadp)` explains the difference.
 
 There is also an interactive app, which compares interpolation methods by
 cross-validation before annotating:
