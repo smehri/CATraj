@@ -1,0 +1,110 @@
+# Byte-compiled / optimized
+__pycache__/
+*.py[cod]
+*$py.class
+
+
+# Distribution / packaging
+build/
+dist/
+*.egg-info/
+*.egg
+.eggs/
+
+# Testing / coverage
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.nox/
+
+# Environments
+.env
+.venv
+env/
+venv/
+ENV/
+
+# Type checkers / linters
+.mypy_cache/
+.ruff_cache/
+.dmypy.json
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Jupyter
+.ipynb_checkpoints/
+
+# ---------------------------------------------------------------------------
+# Generated output
+#
+# Everything below is produced by running the code, and is regenerated on the
+# next run. Committing it would put megabytes of derived data under version
+# control and make every rerun show as a diff.
+# ---------------------------------------------------------------------------
+
+# Working notes
+#
+# CLAUDE.md is the author's own working document: the method extracted
+# from the papers, the decisions taken where they are ambiguous, and the
+# reasoning behind them. It is not part of the published package.
+src/catraj/annotation/CLAUDE.md
+
+# Papers
+#
+# The open-access source papers (CC BY) are committed under papers/, so the
+# method each module implements can be checked against its source.
+#
+# The 2023 Ocean Engineering paper is NOT: it is an Elsevier subscription
+# article and this repository is public. README.md links it by DOI. The
+# patterns below keep it out even if a copy is dropped into the folder.
+papers/*Ocean-Engineering*
+papers/*context-aware approach for vessels*
+
+# Results written by the tutorial notebook
+tutorials/results_trajectory_annotation/
+
+# Files exported from the app
+app/exports/
+
+# ---------------------------------------------------------------------------
+# Data
+#
+# Movement and context datasets are large and often licence-restricted, so they
+# are not committed. The sample archives under datasets/ are the exception:
+# the tutorial and the app both point at them out of the box, so they are
+# force-included below.
+#
+# Point tests at small synthetic fixtures rather than adding real data here.
+# ---------------------------------------------------------------------------
+
+data/
+*.csv
+*.parquet
+*.nc
+*.h5
+*.hdf5
+*.gpkg
+
+# Shapefiles travel as a set of sidecar files, all of which are needed.
+*.shp
+*.shx
+*.dbf
+*.prj
+*.sbn
+*.sbx
+*.cpg
+*.qix
+
+# The sample datasets the tutorial and app depend on.
+!datasets/**

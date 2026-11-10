@@ -1,0 +1,228 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900" width="100%" height="100%" preserveAspectRatio="xMidYMid meet" font-family="'Inter', 'Segoe UI', 'Helvetica Neue', Arial, sans-serif">
+  <title>Trajectory Annotation · Stage 2 — Temporal interpolation [Mehri2023]</title>
+  <desc>Trajectory annotation links every trajectory point to the environmental conditions the vessel moved through, so movement can be analysed in context. Because context is observed far less often than position, an interpolation method must be chosen first: DLT, piecewise polynomial or spline, compared by cross-validation per context variable. The chosen method then annotates every trajectory in the area.</desc>
+
+  <style>
+    :root {
+      --bg:#ffffff; --surface:#fafbfc; --ink:#0d1117; --muted:#656d76;
+      --line:#e4e8ed; --line-strong:#b9c1ca; --accent:#0969da; --amber:#bf8700;
+      --ctx:#e16f24; --traj:#0969da; --good:#1a7f37; --violet:#8250df;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg:#0d1117; --surface:#161b22; --ink:#e6edf3; --muted:#9198a1;
+        --line:#30363d; --line-strong:#484f58; --accent:#4493f8; --amber:#d29922;
+        --ctx:#ec8e4f; --traj:#4493f8; --good:#3fb950; --violet:#bc8cff;
+      }
+    }
+    svg { max-width:100%; max-height:100vh; height:auto; display:block; }
+    text { -webkit-font-smoothing: antialiased; }
+    .title    { fill: var(--ink);    font-size: 26px; font-weight: 700; letter-spacing: -.4px; }
+    .subtitle { fill: var(--muted);  font-size: 13.5px; }
+    .eyebrow  { fill: var(--accent); font-size: 10.5px; font-weight: 700; letter-spacing: 1.6px; }
+    .stagenum { fill: #ffffff;       font-size: 13px; font-weight: 700; }
+    .stage    { fill: var(--ink);    font-size: 17px; font-weight: 600; letter-spacing: -.2px; }
+    .stagesub { fill: var(--muted);  font-size: 11.5px; }
+    .h        { fill: var(--ink);    font-size: 12.5px; font-weight: 600; }
+    .s        { fill: var(--muted);  font-size: 10.5px; }
+    .mono     { fill: var(--ink);    font-size: 11px; font-family: 'JetBrains Mono', Consolas, monospace; }
+    .monos    { fill: var(--muted);  font-size: 10px; font-family: 'JetBrains Mono', Consolas, monospace; }
+    .cap      { fill: var(--muted);  font-size: 10px; font-style: italic; }
+    .foot     { fill: var(--muted);  font-size: 10px; }
+    .card     { fill: var(--surface); stroke: var(--line); stroke-width: 1; rx: 12; }
+    .inner    { fill: var(--bg);      stroke: var(--line); stroke-width: 1; rx: 8; }
+    .flow     { stroke: var(--line-strong); stroke-width: 1.5; fill: none; }
+  </style>
+
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse">
+      <path d="M0,1 L9,5 L0,9 z" fill="#b9c1ca"/>
+    </marker>
+    <marker id="aA" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,1 L9,5 L0,9 z" fill="#8250df"/>
+    </marker>
+  </defs>
+
+  <rect width="1600" height="900" fill="var(--bg)"/>
+
+  <!-- ═══════════ MASTHEAD ═══════════ -->
+  <text x="48" y="50" class="eyebrow">TRAJECTORY ANNOTATION · STAGE 2 OF 2</text>
+  <text x="48" y="82" class="title">Temporal interpolation of context</text>
+  <text x="48" y="105" class="subtitle">Context is observed far less often than position. A curve through time supplies a value at every trajectory timestamp.</text>
+  <text x="1552" y="82" class="foot" text-anchor="end">fed by the spatial stage</text>
+  <text x="1552" y="99" class="foot" text-anchor="end">see spatial_flowchart.svg</text>
+  <line x1="48" y1="124" x2="1552" y2="124" stroke="var(--line)" stroke-width="1"/>
+
+  <!-- ═══════════ THE PROBLEM ═══════════ -->
+  <text x="48" y="156" class="eyebrow" fill="var(--muted)">THE CHALLENGE</text>
+  <text x="182" y="156" class="s">movement and context are observed at different temporal resolutions</text>
+  <rect x="48" y="168" width="1504" height="132" class="card"/>
+
+  <text x="76" y="204" class="h">Vessel positions</text>
+  <text x="76" y="220" class="s">high frequency</text>
+  <line x1="250" y1="211" x2="1500" y2="211" stroke="var(--line)" stroke-width="1"/>
+  <g fill="var(--traj)">
+    <circle cx="250" cy="211" r="3"/><circle cx="290" cy="211" r="3"/><circle cx="330" cy="211" r="3"/><circle cx="370" cy="211" r="3"/>
+    <circle cx="410" cy="211" r="3"/><circle cx="450" cy="211" r="3"/><circle cx="490" cy="211" r="3"/><circle cx="530" cy="211" r="3"/>
+    <circle cx="570" cy="211" r="3"/><circle cx="610" cy="211" r="3"/><circle cx="650" cy="211" r="3"/><circle cx="690" cy="211" r="3"/>
+    <circle cx="730" cy="211" r="3"/><circle cx="770" cy="211" r="3"/><circle cx="810" cy="211" r="3"/><circle cx="850" cy="211" r="3"/>
+    <circle cx="890" cy="211" r="3"/><circle cx="930" cy="211" r="3"/><circle cx="970" cy="211" r="3"/><circle cx="1010" cy="211" r="3"/>
+    <circle cx="1050" cy="211" r="3"/><circle cx="1090" cy="211" r="3"/><circle cx="1130" cy="211" r="3"/><circle cx="1170" cy="211" r="3"/>
+    <circle cx="1210" cy="211" r="3"/><circle cx="1250" cy="211" r="3"/><circle cx="1290" cy="211" r="3"/><circle cx="1330" cy="211" r="3"/>
+    <circle cx="1370" cy="211" r="3"/><circle cx="1410" cy="211" r="3"/><circle cx="1450" cy="211" r="3"/><circle cx="1490" cy="211" r="3"/>
+  </g>
+
+  <rect x="250" y="226" width="625" height="32" rx="5" fill="#bf8700" fill-opacity="0.07" stroke="#bf8700" stroke-opacity="0.35" stroke-width="1" stroke-dasharray="3 2"/>
+  <text x="562" y="247" class="cap" text-anchor="middle" fill="var(--amber)">every position in here has no context value</text>
+
+  <text x="76" y="277" class="h">Context observations</text>
+  <text x="76" y="293" class="s">low frequency</text>
+  <line x1="250" y1="275" x2="1500" y2="275" stroke="var(--line)" stroke-width="1"/>
+  <g fill="var(--ctx)">
+    <circle cx="250" cy="275" r="5"/><circle cx="875" cy="275" r="5"/><circle cx="1500" cy="275" r="5"/>
+  </g>
+  <text x="250" y="296" class="monos" text-anchor="middle">τ₁</text>
+  <text x="875" y="296" class="monos" text-anchor="middle">τ₂</text>
+  <text x="1500" y="296" class="monos" text-anchor="middle">τ₃</text>
+
+  <!-- ═══════════ STAGE 1 ═══════════ -->
+  <circle cx="61" cy="350" r="13" fill="var(--accent)"/>
+  <text x="61" y="355" class="stagenum" text-anchor="middle">1</text>
+  <text x="86" y="348" class="stage">Choose how to estimate context between observations</text>
+  <text x="86" y="366" class="stagesub">A prerequisite, not the method itself · scored on the observations alone, never on a trajectory</text>
+
+  <rect x="48" y="382" width="1000" height="286" class="card"/>
+
+  <text x="76" y="412" class="h">Three candidates reconstruct the context signal between observations</text>
+
+  <rect x="76" y="426" width="304" height="124" class="inner"/>
+  <text x="94" y="449" class="h">DLT</text>
+  <text x="94" y="464" class="s">straight line through consecutive epochs</text>
+  <g transform="translate(94,472)">
+    <line x1="0" y1="56" x2="268" y2="56" stroke="var(--line)" stroke-width="1"/>
+    <polyline points="4,42 36,16 68,17 100,31 132,47 164,41 196,16 228,13 260,24"
+              fill="none" stroke="var(--traj)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+    <g fill="var(--ctx)">
+      <circle cx="4" cy="42" r="3"/><circle cx="36" cy="16" r="3"/><circle cx="68" cy="17" r="3"/>
+      <circle cx="100" cy="31" r="3"/><circle cx="132" cy="47" r="3"/><circle cx="164" cy="41" r="3"/>
+      <circle cx="196" cy="16" r="3"/><circle cx="228" cy="13" r="3"/><circle cx="260" cy="24" r="3"/>
+    </g>
+  </g>
+  <text x="94" y="546" class="monos">Eq. 2 · linear</text>
+
+  <rect x="424" y="426" width="304" height="124" class="inner"/>
+  <text x="442" y="449" class="h">Piecewise polynomial</text>
+  <text x="442" y="464" class="s">degrees 2–7 · least-squares, passes near the points</text>
+  <g transform="translate(442,472)">
+    <line x1="0" y1="56" x2="268" y2="56" stroke="var(--line)" stroke-width="1"/>
+
+    <path d="M4,62 L4,66 L100,66 L100,62" fill="none" stroke="var(--amber)" stroke-width="1" opacity=".7"/>
+    <path d="M100,62 L100,66 L196,66 L196,62" fill="none" stroke="var(--amber)" stroke-width="1" opacity=".7"/>
+    <path d="M196,62 L196,66 L260,66 L260,62" fill="none" stroke="var(--amber)" stroke-width="1" opacity=".7"/>
+
+    <line x1="100" y1="10" x2="100" y2="56" stroke="var(--amber)" stroke-width="1" stroke-dasharray="2 2" opacity=".65"/>
+    <line x1="196" y1="10" x2="196" y2="56" stroke="var(--amber)" stroke-width="1" stroke-dasharray="2 2" opacity=".65"/>
+
+    <!-- least-squares fits: near the points, nearly meeting at the breakpoints -->
+    <path d="M4,39 Q36,15 68,20 Q88,24 100,30" fill="none" stroke="var(--traj)" stroke-width="2" stroke-linecap="round"/>
+    <path d="M100,33 Q130,45 164,38 Q182,34 196,22" fill="none" stroke="var(--traj)" stroke-width="2" stroke-linecap="round"/>
+    <path d="M196,19 Q224,13 260,22" fill="none" stroke="var(--traj)" stroke-width="2" stroke-linecap="round"/>
+
+    <g fill="var(--ctx)">
+      <circle cx="4" cy="42" r="3"/><circle cx="36" cy="16" r="3"/><circle cx="68" cy="17" r="3"/>
+      <circle cx="100" cy="31" r="3"/><circle cx="132" cy="47" r="3"/><circle cx="164" cy="41" r="3"/>
+      <circle cx="196" cy="16" r="3"/><circle cx="228" cy="13" r="3"/><circle cx="260" cy="24" r="3"/>
+    </g>
+
+    <circle cx="100" cy="31" r="7" fill="none" stroke="var(--amber)" stroke-width="1.2" opacity=".85"/>
+    <circle cx="196" cy="20" r="7" fill="none" stroke="var(--amber)" stroke-width="1.2" opacity=".85"/>
+  </g>
+  <text x="442" y="546" class="monos">Eq. 3 · window = degree + 2, sharing a breakpoint</text>
+
+  <rect x="772" y="426" width="248" height="124" class="inner"/>
+  <text x="790" y="449" class="h">Spline</text>
+  <text x="790" y="464" class="s">one smooth curve through every observation</text>
+  <g transform="translate(790,472)">
+    <line x1="0" y1="56" x2="212" y2="56" stroke="var(--line)" stroke-width="1"/>
+    <path d="M3,42 C13,20 18,15 28,15 C39,15 43,17 54,18
+             C65,19 70,26 79,31 C89,37 94,47 104,47
+             C114,47 119,44 130,41 C142,37 145,20 155,16
+             C165,12 172,12 180,13 C191,14 196,21 206,24"
+          fill="none" stroke="var(--good)" stroke-width="2.2" stroke-linecap="round"/>
+    <g fill="var(--ctx)">
+      <circle cx="3" cy="42" r="3"/><circle cx="28" cy="15" r="3"/><circle cx="54" cy="18" r="3"/>
+      <circle cx="79" cy="31" r="3"/><circle cx="104" cy="47" r="3"/><circle cx="130" cy="41" r="3"/>
+      <circle cx="155" cy="16" r="3"/><circle cx="180" cy="13" r="3"/><circle cx="206" cy="24" r="3"/>
+    </g>
+  </g>
+  <text x="790" y="546" class="monos">Eq. 4 · degree ≥ 3, C² continuous</text>
+
+  <text x="424" y="566" class="cap" fill="var(--amber)">amber brackets mark each fitted window; at a shared breakpoint the two least-squares fits need not agree exactly</text>
+  <line x1="76" y1="578" x2="1020" y2="578" stroke="var(--line)" stroke-width="1"/>
+  <text x="76" y="602" class="h">Scored by k-fold cross-validation</text>
+  <text x="76" y="619" class="s">k = 2…10 · first and last observation always kept in training, so no method is asked to extrapolate</text>
+  <text x="76" y="678" class="s">Bearings are interpolated on the unit circle — the caller declares which variables are circular</text>
+  <text x="76" y="642" class="mono">RMSE · MAE · ME · Max|e| · R²</text>
+  <text x="282" y="642" class="s">averaged over all k folds, on held-out observations only</text>
+
+  <!-- result chip + handoff -->
+  <rect x="1076" y="382" width="476" height="286" class="card"/>
+  <rect x="1104" y="410" width="420" height="66" rx="8" fill="#1a7f37" fill-opacity="0.08" stroke="#1a7f37" stroke-opacity="0.4" stroke-width="1"/>
+  <text x="1314" y="437" class="h" text-anchor="middle" fill="var(--good)">Best method for this context</text>
+  <text x="1314" y="457" class="s" text-anchor="middle">fitted on every observation, ready to use</text>
+
+  <path d="M1314,478 L1314,510" class="flow" stroke="#8250df" stroke-width="1.8" marker-end="url(#aA)"/>
+
+  <text x="1104" y="570" class="h">One fitted method per context, per location</text>
+  <text x="1104" y="592" class="s">Wind direction may be best served by a spline,</text>
+  <text x="1104" y="608" class="s">wave height by another method entirely.</text>
+
+  <path d="M1314,548 L1314,690 L800,690 L800,714" class="flow" stroke="#8250df" stroke-width="1.8" marker-end="url(#aA)"/>
+
+  <!-- ═══════════ STAGE 2 ═══════════ -->
+  <circle cx="61" cy="746" r="13" fill="var(--accent)"/>
+  <text x="61" y="751" class="stagenum" text-anchor="middle">2</text>
+  <text x="86" y="744" class="stage">Annotate trajectories</text>
+  <text x="86" y="762" class="stagesub">Each point receives the environmental conditions present when the vessel was there</text>
+
+  <rect x="48" y="778" width="1504" height="80" class="card"/>
+
+  <rect x="76" y="792" width="196" height="52" class="inner"/>
+  <text x="174" y="814" class="h" text-anchor="middle">Trajectories</text>
+  <text x="174" y="831" class="s" text-anchor="middle">many</text>
+
+  <path d="M272,818 L316,818" class="flow" marker-end="url(#a)"/>
+
+  <rect x="316" y="792" width="640" height="52" class="inner"/>
+  <text x="344" y="822" class="h">Read the fitted curve at each timestamp</text>
+  <g transform="translate(636,798)">
+    <line x1="0" y1="30" x2="296" y2="30" stroke="var(--line)" stroke-width="1"/>
+    <path d="M6,25 C40,3 66,7 96,10 C136,15 156,31 190,28 C228,25 254,5 290,9" fill="none" stroke="var(--good)" stroke-width="1.8" stroke-linecap="round"/>
+    <g fill="var(--traj)">
+      <circle cx="28" cy="16" r="2"/><circle cx="50" cy="11" r="2"/><circle cx="72" cy="9" r="2"/>
+      <circle cx="118" cy="13" r="2"/><circle cx="140" cy="19" r="2"/><circle cx="166" cy="25" r="2"/>
+      <circle cx="212" cy="23" r="2"/><circle cx="236" cy="16" r="2"/><circle cx="258" cy="10" r="2"/><circle cx="276" cy="8" r="2"/>
+    </g>
+    <g fill="var(--ctx)"><circle cx="6" cy="25" r="3.5"/><circle cx="96" cy="10" r="3.5"/><circle cx="190" cy="28" r="3.5"/><circle cx="290" cy="9" r="3.5"/></g>
+  </g>
+
+  <path d="M956,818 L1000,818" class="flow" marker-end="url(#a)"/>
+
+  <rect x="1000" y="792" width="264" height="52" rx="8" fill="#1a7f37" fill-opacity="0.08" stroke="#1a7f37" stroke-opacity="0.4" stroke-width="1"/>
+  <text x="1132" y="812" class="h" text-anchor="middle" fill="var(--good)">Contextually enriched trajectory</text>
+  <text x="1132" y="830" class="mono" text-anchor="middle">(xᵢ, yᵢ, tᵢ, cᵢ)</text>
+
+  <g transform="translate(1300,812)">
+    <circle cx="4" cy="-4" r="4.5" fill="var(--ctx)"/>
+    <text x="15" y="0" class="s">context observation</text>
+    <circle cx="4" cy="14" r="3" fill="var(--traj)"/>
+    <text x="15" y="18" class="s">vessel position</text>
+    <line x1="0" y1="30" x2="20" y2="30" stroke="var(--good)" stroke-width="2.2" stroke-linecap="round"/>
+    <text x="28" y="34" class="s">fitted context curve</text>
+  </g>
+
+  <!-- ═══════════ FOOTER ═══════════ -->
+  <line x1="48" y1="874" x2="1552" y2="874" stroke="var(--line)" stroke-width="1"/>
+  <text x="48" y="891" class="foot">Mehri, Alesheikh &amp; Basiri (2023), Ocean Engineering 282, 114916 · §4.1 — the paper’s own contribution.</text>
+  <text x="1552" y="891" class="foot" text-anchor="end">catraj · annotation</text>
+</svg>

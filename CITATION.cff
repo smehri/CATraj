@@ -1,0 +1,87 @@
+cff-version: 1.2.0
+message: >-
+  If you use this software, please cite both the software itself and the paper
+  describing the algorithm you used (see preferred-citation and references).
+title: "catraj: Context-Aware Trajectory Processing"
+abstract: >-
+  Reference implementations of context-aware trajectory annotation, compression
+  and prediction algorithms developed during the doctoral research of Saeed
+  Mehri, compatible with the MovingPandas library. Version 0.1 implements
+  trajectory annotation: spatial interpolation across observation stations
+  followed by temporal interpolation through time, so every trajectory point
+  carries the conditions the moving object passed through.
+type: software
+authors:
+  - family-names: Mehri
+    given-names: Saeed
+    email: sa.mehri20@gmail.com
+version: 0.1.0
+license: BSD-3-Clause
+repository-code: "https://github.com/smehri/catraj"
+keywords:
+  - trajectory annotation
+  - context awareness
+  - movement data
+  - spatial interpolation
+
+# The annotation method implemented in this release.
+preferred-citation:
+  type: article
+  title: "A context-aware approach for vessels' trajectory prediction"
+  authors:
+    - family-names: Mehri
+      given-names: Saeed
+    - family-names: Alesheikh
+      given-names: Ali Asghar
+    - family-names: Basiri
+      given-names: Anahid
+  journal: "Ocean Engineering"
+  volume: 282
+  start: 114916
+  year: 2023
+  doi: 10.1016/j.oceaneng.2023.114916
+
+references:
+  - type: article
+    title: >-
+      A Novel Context-Aware Douglas-Peucker (CADP) Trajectory Compression Method
+    authors:
+      - family-names: Mehri
+        given-names: Saeed
+      - family-names: Hooshangi
+        given-names: Navid
+      - family-names: Mahdizadeh Gharakhanlou
+        given-names: Navid
+    journal: "ISPRS International Journal of Geo-Information"
+    volume: 14
+    issue: 2
+    start: 58
+    year: 2025
+    doi: 10.3390/ijgi14020058
+    notes: "CADP trajectory compression. Planned for a future release."
+
+  - type: article
+    title: "A Contextual Hybrid Model for Vessel Movement Prediction"
+    authors:
+      - family-names: Mehri
+        given-names: Saeed
+      - family-names: Alesheikh
+        given-names: Ali Asghar
+      - family-names: Basiri
+        given-names: Anahid
+    journal: "IEEE Access"
+    volume: 9
+    start: 45600
+    end: 45613
+    year: 2021
+    doi: 10.1109/ACCESS.2021.3066463
+    notes: "CPLS and two-stage CPLS compression, CLSTM. Planned for a future release."
+
+  - type: software
+    title: "MovingPandas: Efficient Structures for Movement Data in Python"
+    authors:
+      - family-names: Graser
+        given-names: Anita
+    year: 2019
+    doi: 10.1553/giscience2019_01_s54
+    notes: "The library catraj extends."

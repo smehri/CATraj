@@ -1,0 +1,196 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900" width="100%" height="100%" preserveAspectRatio="xMidYMid meet" font-family="'Inter', 'Segoe UI', 'Helvetica Neue', Arial, sans-serif">
+  <title>Spatial interpolation of context [catraj]</title>
+  <desc>Context is measured at scattered stations, not at the vessel. For each epoch, station values are interpolated directly to the query position — no raster is built. Candidate methods are compared by leave-one-station-out cross-validation. The result is a time series at the vessel's location, which the temporal stage then interpolates to the exact timestamp.</desc>
+
+  <style>
+    :root {
+      --bg:#ffffff; --surface:#fafbfc; --ink:#0d1117; --muted:#656d76;
+      --line:#e4e8ed; --line-strong:#b9c1ca; --accent:#0969da; --amber:#bf8700;
+      --ctx:#e16f24; --traj:#0969da; --good:#1a7f37; --violet:#8250df;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg:#0d1117; --surface:#161b22; --ink:#e6edf3; --muted:#9198a1;
+        --line:#30363d; --line-strong:#484f58; --accent:#4493f8; --amber:#d29922;
+        --ctx:#ec8e4f; --traj:#4493f8; --good:#3fb950; --violet:#bc8cff;
+      }
+    }
+    svg { max-width:100%; max-height:100vh; height:auto; display:block; }
+    text { -webkit-font-smoothing: antialiased; }
+    .title    { fill: var(--ink);    font-size: 26px; font-weight: 700; letter-spacing: -.4px; }
+    .subtitle { fill: var(--muted);  font-size: 13.5px; }
+    .eyebrow  { fill: var(--accent); font-size: 10.5px; font-weight: 700; letter-spacing: 1.6px; }
+    .stagenum { fill: #ffffff;       font-size: 13px; font-weight: 700; }
+    .stage    { fill: var(--ink);    font-size: 17px; font-weight: 600; letter-spacing: -.2px; }
+    .stagesub { fill: var(--muted);  font-size: 11.5px; }
+    .h        { fill: var(--ink);    font-size: 12.5px; font-weight: 600; }
+    .s        { fill: var(--muted);  font-size: 10.5px; }
+    .mono     { fill: var(--ink);    font-size: 11px; font-family: 'JetBrains Mono', Consolas, monospace; }
+    .monos    { fill: var(--muted);  font-size: 10px; font-family: 'JetBrains Mono', Consolas, monospace; }
+    .cap      { fill: var(--muted);  font-size: 10px; font-style: italic; }
+    .foot     { fill: var(--muted);  font-size: 10px; }
+    .card     { fill: var(--surface); stroke: var(--line); stroke-width: 1; rx: 12; }
+    .inner    { fill: var(--bg);      stroke: var(--line); stroke-width: 1; rx: 8; }
+    .flow     { stroke: var(--line-strong); stroke-width: 1.5; fill: none; }
+  </style>
+
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse">
+      <path d="M0,1 L9,5 L0,9 z" fill="#b9c1ca"/>
+    </marker>
+    <marker id="aA" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,1 L9,5 L0,9 z" fill="#8250df"/>
+    </marker>
+  </defs>
+
+  <rect width="1600" height="900" fill="var(--bg)"/>
+
+  <!-- MASTHEAD -->
+  <text x="48" y="50" class="eyebrow">TRAJECTORY ANNOTATION · STAGE 1 OF 2</text>
+  <text x="48" y="82" class="title">Spatial interpolation of context</text>
+  <text x="48" y="105" class="subtitle">Context is measured at scattered stations — never where the vessel is. Each epoch is interpolated to the vessel's position.</text>
+  <text x="1552" y="82" class="foot" text-anchor="end">feeds the temporal stage</text>
+  <text x="1552" y="99" class="foot" text-anchor="end">see annotation_flowchart.svg</text>
+  <line x1="48" y1="124" x2="1552" y2="124" stroke="var(--line)" stroke-width="1"/>
+
+  <!-- THE CHALLENGE -->
+  <text x="48" y="156" class="eyebrow" fill="var(--muted)">THE CHALLENGE</text>
+  <text x="182" y="156" class="s">context exists at stations, not at the vessel</text>
+  <rect x="48" y="168" width="1504" height="176" class="card"/>
+
+  <!-- map sketch -->
+  <rect x="76" y="188" width="420" height="138" class="inner"/>
+  <text x="94" y="210" class="h">Stations and a vessel</text>
+  <g>
+    <circle cx="150" cy="248" r="6" fill="var(--ctx)"/><text x="150" y="234" class="monos" text-anchor="middle">A</text>
+    <circle cx="290" cy="232" r="6" fill="var(--ctx)"/><text x="290" y="218" class="monos" text-anchor="middle">B</text>
+    <circle cx="410" cy="270" r="6" fill="var(--ctx)"/><text x="410" y="256" class="monos" text-anchor="middle">C</text>
+    <circle cx="210" cy="300" r="6" fill="var(--ctx)"/><text x="210" y="316" class="monos" text-anchor="middle">D</text>
+    <circle cx="352" cy="308" r="6" fill="var(--ctx)"/><text x="352" y="322" class="monos" text-anchor="middle">E</text>
+    <path d="M262,268 l7,12 l-14,0 z" fill="var(--traj)"/>
+    <text x="264" y="262" class="monos" text-anchor="middle" fill="var(--traj)">vessel</text>
+    <g stroke="var(--line-strong)" stroke-width="1" stroke-dasharray="3 3" opacity=".8">
+      <line x1="262" y1="274" x2="150" y2="248"/><line x1="262" y1="274" x2="290" y2="232"/>
+      <line x1="262" y1="274" x2="410" y2="270"/><line x1="262" y1="274" x2="210" y2="300"/>
+      <line x1="262" y1="274" x2="352" y2="308"/>
+    </g>
+  </g>
+
+  <path d="M512,257 L560,257" class="flow" marker-end="url(#a)"/>
+
+  <!-- per-epoch grid -->
+  <rect x="576" y="188" width="440" height="138" class="inner"/>
+  <text x="594" y="210" class="h">Repeated for every epoch</text>
+  <text x="594" y="226" class="s">stations report hourly; each epoch is interpolated on its own</text>
+  <g>
+    <text x="600" y="256" class="monos">τ₁</text><text x="600" y="278" class="monos">τ₂</text><text x="600" y="300" class="monos">…</text>
+    <g fill="var(--ctx)">
+      <circle cx="646" cy="252" r="3.5"/><circle cx="686" cy="252" r="3.5"/><circle cx="726" cy="252" r="3.5"/><circle cx="766" cy="252" r="3.5"/><circle cx="806" cy="252" r="3.5"/>
+      <circle cx="646" cy="274" r="3.5"/><circle cx="686" cy="274" r="3.5"/><circle cx="726" cy="274" r="3.5"/><circle cx="766" cy="274" r="3.5"/><circle cx="806" cy="274" r="3.5"/>
+      <circle cx="646" cy="296" r="3.5"/><circle cx="686" cy="296" r="3.5"/><circle cx="726" cy="296" r="3.5"/><circle cx="766" cy="296" r="3.5"/><circle cx="806" cy="296" r="3.5"/>
+    </g>
+    <g fill="var(--traj)">
+      <path d="M866,248 l6,10 l-12,0 z"/><path d="M866,270 l6,10 l-12,0 z"/><path d="M866,292 l6,10 l-12,0 z"/>
+    </g>
+    <text x="866" y="238" class="monos" text-anchor="middle" fill="var(--traj)">v̂</text>
+    <text x="726" y="318" class="s" text-anchor="middle">m stations</text>
+  </g>
+
+  <path d="M1032,257 L1080,257" class="flow" marker-end="url(#a)"/>
+
+  <rect x="1096" y="188" width="432" height="138" rx="8" fill="#1a7f37" fill-opacity="0.08" stroke="#1a7f37" stroke-opacity="0.4" stroke-width="1"/>
+  <text x="1120" y="212" class="h" fill="var(--good)">A time series at the vessel's position</text>
+  <text x="1120" y="230" class="s">one value per epoch — the input the temporal stage needs</text>
+  <g transform="translate(1120,244)">
+    <line x1="0" y1="52" x2="384" y2="52" stroke="var(--line)" stroke-width="1"/>
+    <polyline points="8,40 56,22 104,26 152,44 200,38 248,16 296,20 344,32 376,28"
+              fill="none" stroke="var(--good)" stroke-width="1.6" stroke-dasharray="3 3" opacity=".7"/>
+    <g fill="var(--good)">
+      <circle cx="8" cy="40" r="3.2"/><circle cx="56" cy="22" r="3.2"/><circle cx="104" cy="26" r="3.2"/>
+      <circle cx="152" cy="44" r="3.2"/><circle cx="200" cy="38" r="3.2"/><circle cx="248" cy="16" r="3.2"/>
+      <circle cx="296" cy="20" r="3.2"/><circle cx="344" cy="32" r="3.2"/><circle cx="376" cy="28" r="3.2"/>
+    </g>
+    <text x="192" y="70" class="cap" text-anchor="middle">→ temporal stage fits a curve through these</text>
+  </g>
+
+  <!-- STAGE: methods -->
+  <circle cx="61" cy="398" r="13" fill="var(--accent)"/>
+  <text x="61" y="403" class="stagenum" text-anchor="middle">1</text>
+  <text x="86" y="396" class="stage">Sample at the point — no raster is built</text>
+  <text x="86" y="414" class="stagesub">Station values are interpolated straight to the query position · a gridded surface is available on request, for viewing not for annotating</text>
+
+  <rect x="48" y="430" width="1000" height="250" class="card"/>
+  <text x="76" y="460" class="h">Candidate methods · interpolated in projected metres (UTM)</text>
+
+  <rect x="76" y="474" width="216" height="86" class="inner"/>
+  <text x="94" y="496" class="h">Nearest · IDW</text>
+  <text x="94" y="513" class="s">exact at stations</text>
+  <text x="94" y="529" class="s">IDW weights 1/dᵖ</text>
+  <text x="94" y="548" class="monos">baseline</text>
+
+  <rect x="308" y="474" width="216" height="86" class="inner"/>
+  <text x="326" y="496" class="h">TIN · Clough–Tocher</text>
+  <text x="326" y="513" class="s">Delaunay: linear, then C¹ cubic</text>
+  <text x="326" y="529" class="s">nothing outside the hull</text>
+  <text x="326" y="548" class="monos">triangulation</text>
+
+  <rect x="540" y="474" width="216" height="86" class="inner"/>
+  <text x="558" y="496" class="h">RBF · thin-plate</text>
+  <text x="558" y="513" class="s">radial kernels</text>
+  <text x="558" y="529" class="s">extends past the hull</text>
+  <text x="558" y="548" class="monos">smooth</text>
+
+  <rect x="772" y="474" width="248" height="86" class="inner"/>
+  <text x="790" y="496" class="h">Kriging</text>
+  <text x="790" y="513" class="s">Gaussian process</text>
+  <text x="790" y="529" class="s">returns uncertainty per point</text>
+  <text x="790" y="548" class="monos">statistical</text>
+
+  <line x1="76" y1="584" x2="1020" y2="584" stroke="var(--line)" stroke-width="1"/>
+  <text x="76" y="608" class="h">Bearings interpolate on the unit circle</text>
+  <text x="76" y="625" class="s">Stations reading 350° and 10° must give 0°, not 180° · cos and sin are interpolated separately, then atan2 · the caller declares which variables are circular</text>
+  <text x="76" y="654" class="s">Points outside the station hull are reported as missing, not invented — TIN and Clough–Tocher cannot reach them.</text>
+
+  <!-- selection panel -->
+  <rect x="1076" y="430" width="476" height="250" class="card"/>
+  <text x="1104" y="460" class="h">Choosing a method</text>
+  <text x="1104" y="482" class="s">Leave-one-station-out cross-validation:</text>
+  <text x="1104" y="498" class="s">hold out a station, predict it from the rest,</text>
+  <text x="1104" y="514" class="s">compare with what it actually observed.</text>
+  <text x="1104" y="538" class="mono">RMSE · MAE · ME · Max|e| · R²</text>
+
+  <g transform="translate(1104,556)">
+    <g fill="var(--ctx)">
+      <circle cx="10" cy="14" r="4"/><circle cx="46" cy="6" r="4"/><circle cx="82" cy="20" r="4"/><circle cx="118" cy="10" r="4"/>
+    </g>
+    <circle cx="154" cy="16" r="5.5" fill="none" stroke="var(--amber)" stroke-width="1.6"/>
+    <text x="186" y="20" class="s">held out</text>
+  </g>
+
+  <text x="1104" y="614" class="s">Default: one method across all epochs.</text>
+  <text x="1104" y="631" class="s">Optional: choose per epoch, when the field's</text>
+  <text x="1104" y="648" class="s">structure changes materially between hours.</text>
+  <text x="1104" y="668" class="cap">Station count is reported — 15 fits are thin for kriging.</text>
+
+  <!-- HANDOFF -->
+  <path d="M800,690 L800,724" class="flow" stroke="#8250df" stroke-width="1.8" marker-end="url(#aA)"/>
+
+  <circle cx="61" cy="758" r="13" fill="var(--accent)"/>
+  <text x="61" y="763" class="stagenum" text-anchor="middle">2</text>
+  <text x="86" y="756" class="stage">Temporal interpolation</text>
+  <text x="86" y="774" class="stagesub">The series produced above is fitted through time, then read at the vessel's exact timestamp</text>
+
+  <rect x="48" y="790" width="1504" height="62" class="card"/>
+  <text x="76" y="816" class="s">Stage 2 is specified in</text>
+  
+  <text x="292" y="816" class="s">— DLT, piecewise polynomial and spline, compared by k-fold cross-validation.</text>
+  <text x="76" y="838" class="s">Together the two stages answer: what were the conditions</text>
+  <text x="368" y="838" class="s" font-style="italic">here</text>
+  <text x="392" y="838" class="s">, at</text>
+  <text x="418" y="838" class="s" font-style="italic">this moment</text>
+  <text x="484" y="838" class="s">?</text>
+
+  <line x1="48" y1="874" x2="1552" y2="874" stroke="var(--line)" stroke-width="1"/>
+  <text x="48" y="891" class="foot">Extends [Mehri2023], which generated per-epoch surfaces but placed the study of spatial interpolation outside its scope.</text>
+  <text x="1552" y="891" class="foot" text-anchor="end">catraj · annotation</text>
+</svg>
