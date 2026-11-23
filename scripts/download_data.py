@@ -68,7 +68,7 @@ ARCHIVES = {
         md5="d8ac0644a670f584daaa4a450cf2baa7", size=1_346_914, folder="E2_Weather_Conditions",
         members=None),
     "[E1] Ocean Conditions.zip": dict(
-        md5="20a1c8f8a6bbbd9bdf9821f938f22add", size=569_784_052, folder="E1_ocean",
+        md5="20a1c8f8a6bbbd9bdf9821f938f22add", size=569_846_491, folder="E1_ocean",
         members=["README_parameters.txt"]),          # + oc_<month>.csv, from --months
 }
 
