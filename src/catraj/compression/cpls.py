@@ -27,8 +27,7 @@ mirrors CADP ("DP first, then add points back"), which is why it sits next to
 
 The paper compares topological signatures by "checking the intersection of the
 trajectories segments and the coastlines".  The decisions below say how that
-sentence is read.  Each is decided here; none has been confirmed with the
-author yet.
+sentence is read.  Each is decided here.
 
 Decisions where the paper leaves room
 -------------------------------------
@@ -170,7 +169,9 @@ class Barriers:
         ndarray of bool
             One value per segment; touching counts as intersecting.
         """
-        x0, y0, x1, y1 = (np.asarray(v, dtype=float).ravel() for v in (x0, y0, x1, y1))
+        x0, y0, x1, y1 = (
+            np.asarray(v, dtype=float).ravel() for v in (x0, y0, x1, y1)
+        )
         out = np.zeros(x0.size, dtype=bool)
         if x0.size == 0 or len(self) == 0:
             return out
@@ -184,7 +185,7 @@ class Barriers:
             out[line_index[touches]] = True
         return out
 
-    def boxes_meet(self, xmin, ymin, xmax, ymax):
+    def _boxes_meet(self, xmin, ymin, xmax, ymax):
         """Whether each bounding box meets the bounding box of some barrier."""
         out = np.zeros(np.size(xmin), dtype=bool)
         if out.size == 0 or len(self) == 0:
@@ -348,7 +349,7 @@ def cpls_select(x, y, epsilon, barriers):
     xmax = np.maximum(np.maximum.reduceat(x, starts), x[ends])
     ymin = np.minimum(np.minimum.reduceat(y, starts), y[ends])
     ymax = np.maximum(np.maximum.reduceat(y, starts), y[ends])
-    flagged = barriers.boxes_meet(xmin, ymin, xmax, ymax) & (ends - starts >= 2)
+    flagged = barriers._boxes_meet(xmin, ymin, xmax, ymax) & (ends - starts >= 2)
 
     if flagged.any():
         cs = _prefix_counts(_original_hits(x, y, barriers))
