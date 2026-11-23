@@ -25,40 +25,53 @@ and the result is always a superset of the Douglas--Peucker result.  This
 mirrors CADP ("DP first, then add points back"), which is why it sits next to
 :mod:`.cadp`.
 
-The paper compares topological signatures by "checking the intersection of the
-trajectories segments and the coastlines".  The decisions below say how that
-sentence is read.  Each is decided here.
+Every decision below was checked against the text of section IV-A and
+Algorithm 1, and follows it; the sentence that settles each point is quoted.
+D1-D7 were confirmed with the author (2026-11-23).  D8 and D9 are
+implementation details the paper does not address.
 
-Decisions where the paper leaves room
--------------------------------------
+Decisions, and the text behind them
+-----------------------------------
 
 * **D1. Stage 1 is** :func:`.douglas_peucker`, called, not reimplemented.
-  Line 7, ``imax = 1``, is read as ``imax = i`` and line 4's range as the
-  interior points -- the same typo and the same reading as in the CADP paper,
-  documented in :mod:`.douglas_peucker`.
-* **D2. Stage 2 is the literal greedy of lines 14-20**: front to back, one
-  point at a time, testing the segment from the last retained point to the
-  point *after* the candidate.  ``Tc = [T1 ... Tj-1, Tj+1 ... Tn]`` still
-  contains ``Tj+1`` when the test runs.
-* **D3. "Consistent" is an intersection test** between the new segment and the
-  barriers, with GEOS ``intersects``.  A segment that only touches a barrier
-  counts as intersecting: the conservative reading.
-* **D4. Existing crossings are tolerated.**  A new segment may intersect a
-  barrier only if the original sub-path it replaces already does.  The paper
-  asks for the *same* signature in the original and the simplified trajectory,
-  not for a crossing-free result, and real positions do fall on the mapped
-  land.  A strict rule would freeze every such stretch.
-* **D5. Sidedness is not checked.**  If the original passes north of a small
-  island and the new segment passes south of it without touching it, CPLS
-  accepts the change.  The paper tests intersection only.  This is a
-  limitation.
-* **D6. The epsilon bound holds against the Douglas--Peucker segment.**  Once
-  stage 2 retains extra points, a dropped point is no longer guaranteed to lie
-  within ``epsilon`` of the segment between its final neighbours -- the same
-  consequence as in :mod:`.cadp`'s ``post`` mode.  It is not "fixed".
-* **D7. The greedy is not minimal.**  It can retain a point even when the
-  Douglas--Peucker segment itself would be consistent, because an intermediate
-  chord was not.  That is the literal reading of lines 14-20.
+  Lines 2-12 are Douglas--Peucker.  Line 7, ``imax = 1``, is read as
+  ``imax = i`` and line 4's range as the interior points -- the same typo and
+  the same reading as in the CADP paper, documented in :mod:`.douglas_peucker`.
+* **D2. Stage 2 runs inside each Douglas--Peucker segment, front to back.**
+  "When there is no error greater than the given threshold, next for all other
+  trajectory vertices p2, ..., p(n-1), it eliminates the first point p2.  After
+  that, it checks the consistency of the topological signature.  If removing
+  p2 destroys the topological signature, it adds it to the trajectory, again.
+  Otherwise, it eliminates p2 and continues the algorithm with the next
+  point."  Removing ``Tj`` leaves ``Tc = [T1 ... Tj-1, Tj+1 ... Tn]`` (line
+  15), so the segment tested runs from the last retained point to ``Tj+1``.
+* **D3. "Consistent" is an intersection test.**  "To compare the topological
+  signature of the original and simplified trajectories, the proposed method
+  checks the intersection of the trajectories segments and the coastlines."
+  It is GEOS ``intersects``, so a segment that only touches a barrier
+  intersects it.
+* **D4. Only new crossings are refused.**  "The topological signature of the
+  original and simplified trajectory should be the same", and "if there are
+  some intersections generated through the compression process, the generated
+  segment is void."  Line 1 builds the original's topological relations to
+  compare against.  A new segment may therefore intersect a barrier only if
+  the original sub-path it replaces already does.
+* **D5. Intersection is the whole test; sidedness is not checked.**  The text
+  above defines the comparison as an intersection check.  If the original
+  passes north of a small island and the new segment passes south of it
+  without touching it, the signature is unchanged in that sense, and CPLS
+  accepts it.  The paper's remark that consistency "may be violated if these
+  geometries are found within the convex hull of the set of vertices forming
+  the trajectory" says where conflicts can arise; here it is used only to
+  skip segments whose bounding box (which contains the hull) meets no barrier.
+* **D6. The offset distance is tested once, by Douglas--Peucker.**  Lines
+  13-20 test only the topological signature.  A point added back is not
+  followed by a new offset test, so a dropped point is within ``epsilon`` of
+  its Douglas--Peucker segment, but not necessarily of the segment between its
+  final neighbours -- as in :mod:`.cadp`'s ``post`` mode.
+* **D7. The pass is the greedy of lines 14-20, as written.**  One point at a
+  time, kept or dropped for good.  It does not search for the fewest points:
+  it can keep a point where another choice would have needed fewer.
 * **D8. Barriers and positions share one projected CRS.**  A mismatch raises;
   nothing is reprojected silently.
 * **D9. Repeated positions** give zero-length segments, which are tested as
