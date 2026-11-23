@@ -1,8 +1,17 @@
 # 09_data — downloaded data (not committed)
 
 Everything in this folder except this file is ignored by git: the archives
-are large and carry their own licences. The notebooks download what they need
-when `DOWNLOAD = True` is set in their settings cell, and expect this layout:
+are large and carry their own licences. To fill it, run this from the
+repository root:
+
+```bash
+python 05_tutorials/download_data.py          # or: annotation | cadp | --check
+```
+
+You can also set `DOWNLOAD = True` in a notebook's settings cell, or download by
+hand. All three ways are explained step by step in
+[`05_tutorials/00_getting_the_data.md`](../05_tutorials/00_getting_the_data.md).
+The code expects this layout:
 
 ```
 09_data/

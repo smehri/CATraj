@@ -10,8 +10,13 @@ environment.
 | `01_cadp_on_annotated_fleet.py` | `10_results/01_trajectory_annotation/06_fleet_annotated.parquet`, every AIS position of the archive with the weather it met (from `05_tutorials/01_trajectory_annotation.ipynb`, `EXPORT_FLEET = True`) | `10_results/02_cadp_compression/`: the compressed fleet in both CADP modes, a per-vessel table and `summary.json` |
 
 ```bash
+python 05_tutorials/download_data.py annotation     # once: the Zenodo archive (~203 MB)
+# run 05_tutorials/01_trajectory_annotation.ipynb with the full archive and EXPORT_FLEET = True
 python 06_workflows/01_cadp_on_annotated_fleet.py
 ```
+
+The data, and the order to run things in, are explained in
+[`05_tutorials/00_getting_the_data.md`](../05_tutorials/00_getting_the_data.md).
 
 ## 01 · CADP on the annotated fleet
 

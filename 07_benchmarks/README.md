@@ -33,9 +33,10 @@ python 07_benchmarks/prepare_feb2016.py             # ~30 s, needs the Zenodo fi
 python 07_benchmarks/paper_experiments.py           # ~3 min
 ```
 
-The Zenodo files are the ones the CADP tutorial uses. Download them as that
-notebook describes (set `DOWNLOAD = True` in its settings cell), so that these
-exist:
+The Zenodo files are the ones the CADP tutorial uses. Get them with
+`python 05_tutorials/download_data.py cadp` (or see
+[`05_tutorials/00_getting_the_data.md`](../05_tutorials/00_getting_the_data.md)),
+so that these exist:
 
 ```
 09_data/zenodo_1167595/P1_AIS_Data/nari_dynamic.csv

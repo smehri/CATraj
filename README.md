@@ -53,11 +53,11 @@ publisher via the DOI. The implementation does not depend on having them.
 | [`02_src/catraj/`](02_src/catraj/) | the library: `annotation`, `compression` |
 | [`03_tests/`](03_tests/) | the test suite (`pytest`) |
 | [`04_app/`](04_app/) | the interactive annotation app |
-| [`05_tutorials/`](05_tutorials/) | notebooks, in order |
+| [`05_tutorials/`](05_tutorials/) | notebooks, in order, and the data guide and downloader (`00_getting_the_data.md`, `download_data.py`) |
 | [`06_workflows/`](06_workflows/) | scripts that run a method over the whole archive |
 | [`07_benchmarks/`](07_benchmarks/) | temporary research scripts, to be removed |
 | [`08_datasets/`](08_datasets/) | the 24-hour sample data, committed |
-| `09_data/` | downloaded archives, not committed ([`README`](09_data/README.md)) |
+| `09_data/` | downloaded archives, not committed ([`README`](09_data/README.md); how to get them: [`00_getting_the_data.md`](05_tutorials/00_getting_the_data.md)) |
 | `10_results/` | everything the notebooks and workflows write, not committed ([`README`](10_results/README.md)) |
 
 ---
@@ -157,6 +157,7 @@ python 04_app/run_app.py       # or double-click 04_app/"Run Annotation App.bat"
 
 | | |
 |---|---|
+| [`05_tutorials/00_getting_the_data.md`](05_tutorials/00_getting_the_data.md) | how to download the public archive the tutorials use: one command, by hand, checksums, troubleshooting |
 | [`05_tutorials/01_trajectory_annotation.ipynb`](05_tutorials/01_trajectory_annotation.ipynb) | annotation on real data, from the 24-hour sample up to the whole six-month archive, with interactive plots |
 | [`05_tutorials/02_cadp_compression.ipynb`](05_tutorials/02_cadp_compression.ipynb) | CADP on the paper's data (AIS + WAVEWATCH III sea state, Feb 2016): download links and licences, both modes, the paper's experiments |
 | [`04_app/README.md`](04_app/README.md) | the app |
@@ -168,7 +169,9 @@ it applies.
 
 ---
 
-## Sample data
+## Data
+
+### Sample data, included
 
 `08_datasets/` holds a matched 24-hour extract that the tutorial and app both use
 out of the box:
@@ -184,6 +187,27 @@ Both cover 2016-02-05 01:00 → 2016-02-06 01:00 UTC, projected to UTM zone 30N.
 extract is CC BY-NC-SA 4.0, so no commercial use. See
 [`08_datasets/LICENSE.md`](08_datasets/LICENSE.md). Nothing in `catraj` depends on
 them; point it at your own data and the question does not arise.
+
+### The full archive, downloaded
+
+The sample is cut from a public six-month archive (October 2015 – March 2016)
+on Zenodo, [doi:10.5281/zenodo.1167595](https://doi.org/10.5281/zenodo.1167595)
+(Ray et al., 2019). The full annotation run, the CADP tutorial, the workflows
+and the benchmarks use it. It is not in the repository. Fetch it with:
+
+```bash
+python 05_tutorials/download_data.py              # ~773 MB; or: annotation (~203 MB) | cadp (~771 MB)
+python 05_tutorials/download_data.py --check      # what is present
+```
+
+The script uses only the standard library. It verifies each archive against
+the checksum Zenodo publishes, resumes interrupted downloads, and extracts into
+`09_data/zenodo_1167595/`, which git ignores.
+[`05_tutorials/00_getting_the_data.md`](05_tutorials/00_getting_the_data.md)
+covers everything else: which tutorial needs which files, downloading by hand,
+disk space, the order to run things in, troubleshooting, and the licences.
+The AIS data is CC BY-NC-SA 4.0 (no commercial use), and the sea state must be
+cited.
 
 ---
 
@@ -213,5 +237,7 @@ extends. `CITATION.cff` has both in machine-readable form.
 **Code:** BSD 3-Clause — the same licence as MovingPandas, so code may be
 contributed upstream.
 
-**Sample data:** third-party, with its own terms. See
-[`08_datasets/LICENSE.md`](08_datasets/LICENSE.md).
+**Data:** third-party, with its own terms. See
+[`08_datasets/LICENSE.md`](08_datasets/LICENSE.md) for the sample, and section 7
+of [`00_getting_the_data.md`](05_tutorials/00_getting_the_data.md) for the
+downloaded archive.
