@@ -1,11 +1,13 @@
 import geopandas as gpd
 import numpy as np
+import pandas as pd
 import pytest
 import shapely
 
 from catraj.compression import (
     Barriers,
     CplsSelection,
+    cpls_compress,
     cpls_select,
     douglas_peucker,
     segment_crossings,
@@ -317,3 +319,73 @@ def test_cpls_handles_a_long_trajectory():
     assert (sel.mask >= sel.dp).all()
     assert sel.topology.any()
     assert not segment_crossings(x, y, parts, keep=sel.mask, new_only=True).any()
+
+
+# ------------------------------------------------------------ dataframes
+
+
+def _frame(n=120, seed=0, crs=32630):
+    x, y = _walk(n=n, seed=seed)
+    return gpd.GeoDataFrame(
+        {"speed": np.arange(n, dtype=float), "vid": 1},
+        geometry=gpd.points_from_xy(x, y),
+        index=pd.date_range("2016-02-05", periods=n, freq="30s"),
+        crs=crs,
+    )
+
+
+def _frame_barriers(gdf, seed=0):
+    return _barriers_for(gdf.geometry.x.to_numpy(), gdf.geometry.y.to_numpy(), seed)
+
+
+def test_cpls_compress_keeps_every_column():
+    gdf = _frame()
+    barriers = _frame_barriers(gdf)
+    out = cpls_compress(gdf, 150.0, barriers)
+    assert list(out.columns) == list(gdf.columns)
+    assert 2 < len(out) < len(gdf)
+    assert out.index.isin(gdf.index).all()
+    mask = _mask(gdf.geometry.x.to_numpy(), gdf.geometry.y.to_numpy(), 150.0, barriers)
+    assert out.index.equals(gdf.index[mask])
+    assert out.crs == gdf.crs
+
+
+def test_cpls_compress_by_group():
+    a, b = _frame(seed=0), _frame(seed=1)
+    b["vid"] = 2
+    barriers = _frame_barriers(a) + _frame_barriers(b, seed=1)
+    out = cpls_compress(pd.concat([a, b]), 150.0, barriers, by="vid")
+    assert set(out.vid) == {1, 2}
+    assert out[out.vid == 1].equals(cpls_compress(a, 150.0, barriers))
+    assert out[out.vid == 2].equals(cpls_compress(b, 150.0, barriers))
+
+
+def test_cpls_compress_refuses_geographic_coordinates():
+    with pytest.raises(ValueError, match="geographic"):
+        cpls_compress(_frame(crs=4326), 50.0, [])
+
+
+def test_cpls_compress_refuses_a_crs_mismatch():
+    gdf = _frame()
+    wrong = gpd.GeoSeries([shapely.Point(0, 0).buffer(10)], crs=3035)
+    with pytest.raises(ValueError, match="CRS"):
+        cpls_compress(gdf, 50.0, wrong)
+    # Plain shapely geometries carry no CRS, and a matching CRS is fine.
+    cpls_compress(gdf, 50.0, [shapely.Point(0, 0).buffer(10)])
+    cpls_compress(gdf, 50.0, wrong.set_crs(32630, allow_override=True))
+
+
+@pytest.mark.movingpandas
+def test_cpls_compress_movingpandas_objects():
+    mpd = pytest.importorskip("movingpandas")
+    gdf = _frame()
+    barriers = Barriers(_frame_barriers(gdf), crs=32630)
+    traj = mpd.Trajectory(gdf, traj_id="v1")
+    out = cpls_compress(traj, 150.0, barriers)
+    assert isinstance(out, mpd.Trajectory) and out.id == "v1"
+    assert "speed" in out.df.columns and len(out.df) < len(traj.df)
+
+    coll = mpd.TrajectoryCollection([traj, mpd.Trajectory(_frame(seed=1), traj_id="v2")])
+    out_coll = cpls_compress(coll, 150.0, barriers)
+    assert isinstance(out_coll, mpd.TrajectoryCollection)
+    assert len(out_coll.trajectories) == len(coll.trajectories) == 2

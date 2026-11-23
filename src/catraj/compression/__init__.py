@@ -31,14 +31,20 @@ from .cadp import (
     context_errors,
     nominal_boundaries,
 )
-from .cpls import Barriers, CplsSelection, cpls_select, segment_crossings
+from .cpls import (
+    Barriers,
+    CplsSelection,
+    cpls_compress,
+    cpls_select,
+    segment_crossings,
+)
 from .douglas_peucker import douglas_peucker, segment_distances
 from .evaluation import compression_ratio, dtw
 
 __all__ = [
     "compress", "cadp_select", "Context", "Selection",
     "context_errors", "nominal_boundaries",
-    "Barriers", "CplsSelection", "segment_crossings", "cpls_select",
+    "Barriers", "CplsSelection", "segment_crossings", "cpls_select", "cpls_compress",
     "douglas_peucker", "segment_distances",
     "compression_ratio", "dtw",
 ]

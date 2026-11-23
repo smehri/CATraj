@@ -97,6 +97,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 import numpy as np
+import pandas as pd
 import shapely
 
 from .douglas_peucker import douglas_peucker
@@ -106,6 +107,7 @@ __all__ = [
     "CplsSelection",
     "segment_crossings",
     "cpls_select",
+    "cpls_compress",
 ]
 
 _FIRST_BLOCK = 64
@@ -353,3 +355,74 @@ def cpls_select(x, y, epsilon, barriers):
         for s, e in zip(starts[flagged], ends[flagged]):
             _greedy(x, y, barriers, cs, int(s), int(e), keep)
     return CplsSelection(dp=dp, topology=keep & ~dp)
+
+
+# ------------------------------------------------------------ dataframes
+
+
+def _select_frame(df, epsilon, barriers):
+    crs = getattr(df, "crs", None)
+    if crs is not None and crs.is_geographic:
+        raise ValueError(
+            "the trajectory is in a geographic CRS; epsilon is a distance, so "
+            "reproject to a projected CRS in metres first (e.g. .to_crs(...))"
+        )
+    if crs is not None and barriers.crs is not None:
+        from pyproj import CRS
+
+        if CRS.from_user_input(barriers.crs) != CRS.from_user_input(crs):
+            raise ValueError(
+                "the barriers and the trajectory are in different CRS; "
+                "reproject the barriers with .to_crs(...) to the trajectory's"
+            )
+    geom = df.geometry
+    return cpls_select(geom.x.to_numpy(), geom.y.to_numpy(), epsilon, barriers)
+
+
+def cpls_compress(traj, epsilon, barriers, by=None):
+    """Compress trajectories with CPLS.
+
+    The result is a row subset of the input, so every column of every retained
+    point survives.  CPLS does not use time: row order is trajectory order.
+
+    Parameters
+    ----------
+    traj : movingpandas.Trajectory, TrajectoryCollection or GeoDataFrame
+        Positions in a projected CRS, in trajectory order.
+    epsilon : float
+        Douglas--Peucker threshold, in the CRS's units (metres).
+    barriers : Barriers or anything :class:`Barriers` accepts
+        Shorelines or land.  Built once and reused for every trajectory.  When
+        both the trajectory and the barriers have a CRS they must match; if
+        either is unknown they are assumed to.
+    by : str, optional
+        For a GeoDataFrame holding several trajectories: the column naming
+        each one.  Each is compressed on its own.
+
+    Returns
+    -------
+    The same kind of object, holding only the retained points.
+    """
+    barriers = _as_barriers(barriers)
+
+    if hasattr(traj, "trajectories"):  # TrajectoryCollection
+        import movingpandas as mpd
+
+        return mpd.TrajectoryCollection([
+            cpls_compress(tr, epsilon, barriers) for tr in traj.trajectories
+        ])
+
+    if hasattr(traj, "df") and hasattr(traj, "id"):  # Trajectory
+        import movingpandas as mpd
+
+        mask = _select_frame(traj.df, epsilon, barriers).mask
+        return mpd.Trajectory(traj.df.iloc[mask].copy(), traj.id)
+
+    if by is not None:
+        parts = [
+            group.iloc[_select_frame(group, epsilon, barriers).mask]
+            for _, group in traj.groupby(by, sort=False)
+        ]
+        return pd.concat(parts) if parts else traj.iloc[:0]
+
+    return traj.iloc[_select_frame(traj, epsilon, barriers).mask].copy()
