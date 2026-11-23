@@ -1,0 +1,51 @@
+name: tests
+
+# Runs the test suite on every push to main and on every pull request.
+# "Run workflow" on the Actions tab starts it by hand.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+# A newer push to the same branch or pull request replaces the run in progress.
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  pytest:
+    name: ${{ matrix.os }}, Python ${{ matrix.python }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        # Every Python version pyproject.toml declares, on Linux; one Windows
+        # job, since that is where the geospatial stack is hardest to install.
+        os: [ubuntu-latest]
+        python: ["3.10", "3.11", "3.12"]
+        include:
+          - os: windows-latest
+            python: "3.12"
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: ${{ matrix.python }}
+          cache: pip
+          cache-dependency-path: pyproject.toml
+
+      # Installed with pip from pyproject.toml alone, so the run also checks
+      # that the declared dependencies are enough. The movingpandas extra is
+      # included so the tests that need it run instead of being skipped.
+      - name: Install catraj
+        run: python -m pip install -e ".[test,movingpandas]"
+
+      # data/sample/ is committed, so the tests marked "data" run too.
+      - name: Run the tests
+        run: python -m pytest -ra
