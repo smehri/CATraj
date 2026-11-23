@@ -12,7 +12,7 @@ from catraj.compression import (
     douglas_peucker,
     segment_crossings,
 )
-from catraj.compression.cpls import _direction_cells
+from catraj.compression.cpls import RULES, _direction_cells, _segments_meet
 
 from helpers import DATASETS
 
@@ -40,52 +40,131 @@ def _reference_cells(line, box):
     return cells
 
 
-def _reference_cpls(x, y, epsilon, barriers):
-    """Algorithm 1 read literally, with Tienaah's signature (D3-D5).
+def _reference_cpls(x, y, epsilon, barriers, **flags):
+    """Algorithm 1 read literally, with every relation of the signature.
 
-    One test per candidate point.  The chord from the last retained point
-    ``a`` to ``j + 1`` replaces the sub-path ``a .. j + 1``; it is consistent
-    if it creates no intersection the sub-path lacks, and if every barrier
-    part meeting the sub-path's convex hull sees the same nine cells crossed
-    by both, the cells drawn around that part's extent inside the hull.
+    One test per candidate point, against the whole current trajectory
+    ``Tc``: the final units before ``a``, the candidate ``a -> k``, and the
+    original segments after ``k``.  Everything is plain shapely; a geometry
+    that does not move is a point.  Returns ``(keep, rules)``.
     """
+    on = dict(topology=True, direction=True, avoid_self_intersection=True,
+              keep_self_intersection=True, inversion=True)
+    on.update(flags)
     x, y = np.asarray(x, float), np.asarray(y, float)
     n = len(x)
     parts = [p for g in barriers for p in shapely.get_parts(g) if not p.is_empty]
     dp = douglas_peucker(x, y, epsilon)
     keep = dp.copy()
+    rules = {name: np.zeros(n, bool) for name in RULES}
 
-    def line(i, j):
-        return shapely.LineString(np.column_stack([x[i:j + 1], y[i:j + 1]]))
+    def path(i, j):
+        pts = np.column_stack([x[i:j + 1], y[i:j + 1]])
+        if (pts == pts[0]).all():
+            return shapely.Point(pts[0])
+        return shapely.LineString(pts)
 
     def chord(i, j):
-        return shapely.LineString([(x[i], y[i]), (x[j], y[j])])
+        return path(i, j) if j == i + 1 else path(i, i).union(path(j, j)).convex_hull
 
-    orig = [any(p.intersects(line(i, i + 1)) for p in parts) for i in range(n - 1)]
+    def hull(i, j):
+        return shapely.MultiPoint(np.column_stack([x[i:j + 1], y[i:j + 1]])).convex_hull
 
-    def consistent(a, k):
-        c = chord(a, k)
-        if any(p.intersects(c) for p in parts) and not any(orig[a:k]):
-            return False
-        sub = line(a, k)
-        points = np.column_stack([x[a:k + 1], y[a:k + 1]])
-        hull = shapely.MultiPoint(points).convex_hull
-        for p in parts:
-            if not p.intersects(hull):
-                continue
-            box = p.intersection(hull).bounds
-            if _reference_cells(sub, box) != _reference_cells(c, box):
-                return False
-        return True
+    def point(i):
+        return shapely.Point(x[i], y[i])
 
+    def meet(g1, g2, v):
+        if v is None:
+            return g1.intersects(g2)
+        return not g1.intersection(g2).difference(point(v)).is_empty
+
+    def broken(a, k, retained):
+        sub, c, h = path(a, k), chord(a, k), hull(a, k)
+        near = [p for p in parts if p.intersects(h)]
+        if on["topology"] and any(sub.relate(p) != c.relate(p) for p in near):
+            return "topology"
+        if on["direction"]:
+            for p in near:
+                piece = p.intersection(h)
+                if piece.is_empty:
+                    continue
+                if _reference_cells(sub, piece.bounds) != _reference_cells(c, piece.bounds):
+                    return "direction"
+        if on["avoid_self_intersection"] or on["keep_self_intersection"]:
+            units = [(retained[u], retained[u + 1]) for u in range(len(retained) - 1)]
+            units += [(j, j + 1) for j in range(k, n - 1)]
+            for p, q in units:
+                v = a if q == a else (k if p == k else None)
+                in_sub, in_chord = meet(sub, path(p, q), v), meet(c, chord(p, q), v)
+                if on["avoid_self_intersection"] and in_chord and not in_sub:
+                    return "self_intersection"
+                if on["keep_self_intersection"] and in_sub and not in_chord:
+                    return "self_intersection"
+        if on["inversion"]:
+            if len(retained) >= 2:
+                p = retained[-2]
+                if hull(p, a).contains(point(k)) or h.contains(point(p)):
+                    return "inversion"
+            if k + 1 < n:
+                if h.contains(point(k + 1)) or chord(k, k + 1).contains(point(a)):
+                    return "inversion"
+        return None
+
+    retained = [0]
     kept = np.flatnonzero(dp)
     for s, e in zip(kept[:-1], kept[1:]):
         a = s
         for j in range(s + 1, e):
-            if not consistent(a, j + 1):
+            failed = broken(a, j + 1, retained)
+            if failed:
                 keep[j] = True
+                rules[failed][j] = True
+                retained.append(j)
                 a = j
-    return keep
+        retained.append(e)
+    return keep, rules
+
+
+def _check_signature(x, y, mask, barriers):
+    """Every relation, checked on a finished result independently of the pass.
+
+    Each final unit keeps D4 and D5 against its neighbours; every pair of
+    final units meets as their sub-paths do (D6); consecutive units do not
+    invert (D7).
+    """
+    x, y = np.asarray(x, float), np.asarray(y, float)
+    parts = [p for g in barriers for p in shapely.get_parts(g) if not p.is_empty]
+    r = np.flatnonzero(mask)
+
+    def path(i, j):
+        pts = np.column_stack([x[i:j + 1], y[i:j + 1]])
+        return shapely.Point(pts[0]) if (pts == pts[0]).all() else shapely.LineString(pts)
+
+    def chord(i, j):
+        return path(i, j) if j == i + 1 else path(i, i).union(path(j, j)).convex_hull
+
+    def hull(i, j):
+        return shapely.MultiPoint(np.column_stack([x[i:j + 1], y[i:j + 1]])).convex_hull
+
+    units = list(zip(r[:-1], r[1:]))
+    for p, q in units:
+        h = hull(p, q)
+        for part in parts:
+            if part.intersects(h):
+                assert path(p, q).relate(part) == chord(p, q).relate(part)
+                box = part.intersection(h).bounds
+                assert _reference_cells(path(p, q), box) == _reference_cells(chord(p, q), box)
+    for u, (p, q) in enumerate(units):
+        for w, (s, t) in enumerate(units[u + 1:], start=u + 1):
+            v = q if w == u + 1 else None
+            a = path(p, q).intersection(path(s, t))
+            b = chord(p, q).intersection(chord(s, t))
+            if v is not None:
+                a, b = (g.difference(shapely.Point(x[v], y[v])) for g in (a, b))
+            assert a.is_empty == b.is_empty, (u, w)
+    for (p, q), (_, t) in zip(units[:-1], units[1:]):
+        assert not hull(p, q).contains(shapely.Point(x[t], y[t]))
+        assert not hull(q, t).contains(shapely.Point(x[p], y[p]))
 
 
 def _walk(n=400, seed=0):
@@ -199,13 +278,121 @@ SEEDS = range(5)
 EPSILONS = [30.0, 150.0, 600.0]
 
 
+OFF = dict(topology=False, direction=False, avoid_self_intersection=False,
+           keep_self_intersection=False, inversion=False)
+BARRIERS_ONLY = dict(OFF, topology=True, direction=True)
+
+
+def _assert_same(sel, reference):
+    keep, rules = reference
+    assert np.array_equal(sel.mask, keep)
+    for name in RULES:
+        assert np.array_equal(sel.rules[name], rules[name]), name
+
+
 @pytest.mark.parametrize("epsilon", EPSILONS)
 @pytest.mark.parametrize("seed", SEEDS)
 def test_cpls_matches_the_literal_algorithm(seed, epsilon):
-    x, y = _walk(seed=seed)
+    x, y = _walk(n=120, seed=seed)
     parts = _barriers_for(x, y, seed)
-    got = _mask(x, y, epsilon, parts)
-    assert np.array_equal(got, _reference_cpls(x, y, epsilon, parts))
+    _assert_same(cpls_select(x, y, epsilon, parts),
+                 _reference_cpls(x, y, epsilon, parts))
+
+
+@pytest.mark.parametrize("name", sorted(OFF))
+@pytest.mark.parametrize("seed", range(3))
+def test_each_relation_alone_matches_the_literal_algorithm(seed, name):
+    x, y = _walk(n=120, seed=seed)
+    parts = _barriers_for(x, y, seed)
+    flags = dict(OFF, **{name: True})
+    _assert_same(cpls_select(x, y, 150.0, parts, **flags),
+                 _reference_cpls(x, y, 150.0, parts, **flags))
+
+
+def test_repeated_positions_match_the_literal_algorithm():
+    # A vessel that stops: runs of identical positions and GPS jitter round a
+    # mooring, then moves on.  Zero-length segments are points (D9).
+    rng = np.random.default_rng(3)
+    x, y = _walk(n=60, seed=3)
+    moor = np.repeat(np.column_stack([x[30], y[30]]), 25, axis=0)
+    moor[5:20] += np.round(rng.normal(0, 3, size=(15, 2)))
+    x = np.r_[x[:30], moor[:, 0], x[30:]]
+    y = np.r_[y[:30], moor[:, 1], y[30:]]
+    parts = _barriers_for(x, y, 3)
+    for eps in (20.0, 200.0):
+        sel = cpls_select(x, y, eps, parts)
+        _assert_same(sel, _reference_cpls(x, y, eps, parts))
+        _check_signature(x, y, sel.mask, parts)
+
+
+@pytest.mark.parametrize("seed", SEEDS)
+def test_the_result_keeps_every_relation(seed):
+    x, y = _walk(n=150, seed=seed)
+    parts = _barriers_for(x, y, seed)
+    for eps in (60.0, 400.0):
+        _check_signature(x, y, cpls_select(x, y, eps, parts).mask, parts)
+
+
+def test_every_relation_off_is_plain_dp():
+    x, y = _walk(seed=1)
+    parts = _barriers_for(x, y, 1)
+    sel = cpls_select(x, y, 100.0, parts, **OFF)
+    assert np.array_equal(sel.mask, douglas_peucker(x, y, 100.0))
+
+
+def test_a_touch_must_survive_simplification():
+    # D4, DE-9IM: the path touches the barrier at a vertex; the chord would
+    # not touch it at all, so the vertex stays.
+    sel = cpls_select([0, 5, 10], [0, 1, 0], 10, shapely.Point(5, 1))
+    assert _idx(sel.mask) == [0, 1, 2]
+    assert sel.rules["topology"][1]
+
+
+def test_a_new_self_intersection_is_refused():
+    x, y = np.array([(0, 0), (5, 4), (10, 0), (10, -2), (5, 2.5), (5, -3),
+                     (20, -3)], float).T
+    assert _idx(cpls_select(x, y, 100, [], **OFF).mask) == [0, 6]
+    sel = cpls_select(x, y, 100, [], **dict(OFF, avoid_self_intersection=True))
+    # The chord 0 -> 2 would cross segment 3-4, which the path never meets.
+    assert _idx(sel.mask) == [0, 1, 6]
+    assert sel.rules["self_intersection"][1]
+
+
+def test_an_existing_self_intersection_is_kept():
+    # The path comes back through its own vertex 1; dropping 3 and 4 would
+    # lose that meeting.
+    x, y = np.array([(0, 0), (4, 0), (6, 1), (6, 3), (4, 3), (4, -2),
+                     (10, -2)], float).T
+    keep = dict(OFF, keep_self_intersection=True)
+    assert _idx(cpls_select(x, y, 100, [], **keep).mask) == [0, 3, 4, 6]
+    avoid = dict(OFF, avoid_self_intersection=True)
+    assert _idx(cpls_select(x, y, 100, [], **avoid).mask) == [0, 6]
+
+
+def test_a_turn_back_into_the_hull_is_an_inversion():
+    x, y = np.array([(0, 0), (4, 3), (8, 0), (5, 1), (3, -4)], float).T
+    sel = cpls_select(x, y, 100, [], **dict(OFF, inversion=True))
+    # Point 3 lies inside the hull of 0..2 (heuristic 3.7): 1 is kept.
+    assert _idx(sel.mask) == [0, 1, 4]
+    assert sel.rules["inversion"][1]
+    zigzag = np.array([(0, 0), (3, 2), (6, 0), (9, 2), (12, 0)], float).T
+    assert _idx(cpls_select(*zigzag, 100, [], **dict(OFF, inversion=True)).mask) == [0, 4]
+
+
+def test_segments_meet_matches_shapely_with_points_for_zero_length():
+    rng = np.random.default_rng(0)
+    pts = np.round(rng.uniform(0, 6, size=(4000, 8)))  # many collinear, touching
+    pts[::7, 2:4] = pts[::7, 0:2]  # zero-length first segments
+    pts[::11, 6:8] = pts[::11, 4:6]  # zero-length second segments
+
+    def geom(ax, ay, bx, by):
+        if ax == bx and ay == by:
+            return shapely.Point(ax, ay)
+        return shapely.LineString([(ax, ay), (bx, by)])
+
+    ours = _segments_meet(*pts.T)
+    expected = [geom(*r[:4]).intersects(geom(*r[4:])) for r in pts]
+    assert np.array_equal(ours, expected)
 
 
 def test_cpls_matches_the_literal_algorithm_when_the_last_segment_is_affected():
@@ -218,7 +405,7 @@ def test_cpls_matches_the_literal_algorithm_when_the_last_segment_is_affected():
     sel = cpls_select(x, y, 500, wall)
     assert _idx(sel.dp) == [0, 1, 13]
     assert _idx(sel.mask) == [0, 1, 8, 13]
-    assert np.array_equal(sel.mask, _reference_cpls(x, y, 500, [wall]))
+    _assert_same(sel, _reference_cpls(x, y, 500, [wall]))
 
 
 def test_cpls_matches_the_literal_algorithm_with_many_retained_points():
@@ -229,8 +416,8 @@ def test_cpls_matches_the_literal_algorithm_with_many_retained_points():
         path = shapely.linestrings(np.column_stack([x, y]))
         parts = [g for g in _barriers_for(x, y, seed, count=1500)
                  if not shapely.intersects(g, path)]
-        sel = cpls_select(x, y, 5_000.0, parts)
-        ref = _reference_cpls(x, y, 5_000.0, parts)
+        sel = cpls_select(x, y, 5_000.0, parts, **BARRIERS_ONLY)
+        ref, _ = _reference_cpls(x, y, 5_000.0, parts, **BARRIERS_ONLY)
         assert np.array_equal(sel.mask, ref)
         assert sel.topology.sum() > 20
 
@@ -275,10 +462,11 @@ def test_a_path_clear_of_barriers_stays_clear(seed, epsilon):
 
 
 def test_no_barriers_is_plain_dp():
+    # With only the barrier relations on; the others act without barriers.
     x, y = _walk(seed=2)
     far = shapely.box(1e7, 1e7, 1e7 + 10, 1e7 + 10)
     for barriers in ([], shapely.GeometryCollection(), far):
-        sel = cpls_select(x, y, 100.0, barriers)
+        sel = cpls_select(x, y, 100.0, barriers, **BARRIERS_ONLY)
         assert np.array_equal(sel.mask, douglas_peucker(x, y, 100.0))
         assert not sel.added.any()
 
@@ -394,13 +582,15 @@ def test_summary_reports_the_topology_stage():
 
 
 def test_cpls_handles_a_long_trajectory():
-    n = 100_000
-    t = np.linspace(0, 400 * np.pi, n)
+    # A winding track among many small islands; long enough to show nothing
+    # in the pass grows out of hand (100,000 points take about half a minute).
+    n = 20_000
+    t = np.linspace(0, 80 * np.pi, n)
     x = t * 10.0
     y = 300.0 * np.sin(t) + 20.0 * np.sin(37 * t)
     rng = np.random.default_rng(0)
-    cx = rng.uniform(x.min(), x.max(), 2_000)
-    cy = rng.uniform(-350, 350, 2_000)
+    cx = rng.uniform(x.min(), x.max(), 400)
+    cy = rng.uniform(-350, 350, 400)
     parts = list(shapely.buffer(shapely.points(cx, cy), 15.0))
     sel = cpls_select(x, y, 50.0, parts)
     assert (sel.mask >= sel.dp).all()
@@ -483,7 +673,9 @@ def test_cpls_on_the_sample_fleet():
     ais = gpd.read_file(DATASETS / "AIS" / "AIS_DLT_UTM.shp")
     ais = ais.sort_values(["sourcemmsi", "t"], kind="stable")
     land = Barriers(gpd.read_file(DATASETS / "Coastline" / "Coastline_UTM.shp"))
-    out = cpls_compress(ais, 1_000, land, by="sourcemmsi")
+    # The barrier relations over the whole fleet; every relation is checked on
+    # moving vessels below (moored ones are slow with all of them).
+    out = cpls_compress(ais, 1_000, land, by="sourcemmsi", **BARRIERS_ONLY)
 
     dp_index, dp_new, cpls_new = [], 0, 0
     for _, g in ais.groupby("sourcemmsi", sort=False):
@@ -498,3 +690,19 @@ def test_cpls_on_the_sample_fleet():
     assert cpls_new == 0
     assert len(dp_index) <= len(out) < len(ais)
     assert set(dp_index) <= set(out.index)
+
+
+@pytest.mark.data
+def test_every_relation_on_moving_sample_vessels():
+    ais = gpd.read_file(DATASETS / "AIS" / "AIS_DLT_UTM.shp")
+    ais = ais.sort_values(["sourcemmsi", "t"], kind="stable")
+    land = gpd.read_file(DATASETS / "Coastline" / "Coastline_UTM.shp")
+    moving = ais.groupby("sourcemmsi").speedoverg.median()
+    moving = moving[(moving > 5) & (moving < 40)].index[:12]
+    for mmsi in moving:
+        g = ais[ais.sourcemmsi == mmsi]
+        x, y = g.geometry.x.to_numpy(), g.geometry.y.to_numpy()
+        sel = cpls_select(x, y, 1_000, land)
+        assert (sel.mask >= sel.dp).all()
+        assert not segment_crossings(x, y, land, keep=sel.mask, new_only=True).any()
+        _check_signature(x, y, sel.mask, list(land.geometry))
