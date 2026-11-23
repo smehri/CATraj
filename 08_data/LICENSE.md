@@ -4,12 +4,18 @@
 data in this folder comes from third parties and carries its own terms, which
 are stricter. Read them before redistributing or using this data.
 
-Each dataset's own parameter file (`AIS_parameters.txt`,
-`Weather_parameters.txt`) carries the full field descriptions and provenance.
+This file covers the 24-hour sample committed in `sample/`. Each dataset's own
+parameter file (`AIS_parameters.txt`, `Weather_parameters.txt`) carries the
+full field descriptions and provenance.
+
+The full archive you download into `zenodo_1167595/` comes from the same
+source under the same terms, plus the sea state data. Its licences are listed
+in section 7 of
+[`05_tutorials/00_getting_the_data.md`](../05_tutorials/00_getting_the_data.md).
 
 ---
 
-## AIS — `AIS/`
+## AIS — `sample/AIS/`
 
 Vessel positions from the Automatic Identification System.
 
@@ -31,7 +37,7 @@ Vessel positions from the Automatic Identification System.
 
 ---
 
-## Weather — `context/Weather/`
+## Weather — `sample/Weather/`
 
 Coastal weather observations.
 

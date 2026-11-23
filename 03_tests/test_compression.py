@@ -426,7 +426,7 @@ def test_cadp_on_an_annotated_sample_vessel():
     from catraj.annotation import IDW, Spline, annotate_points
 
     ais = gpd.read_file(DATASETS / "AIS" / "AIS_DLT_UTM.shp")
-    weather = gpd.read_file(DATASETS / "context" / "Weather" / "Weather_Observation_UTM.shp")
+    weather = gpd.read_file(DATASETS / "Weather" / "Weather_Observation_UTM.shp")
     stations = pd.DataFrame({
         "x": weather.geometry.x, "y": weather.geometry.y,
         "t": weather.local_time.astype(float), "value": weather.Ff.astype(float),

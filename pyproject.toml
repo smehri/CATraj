@@ -69,7 +69,7 @@ catraj = ["py.typed"]
 [tool.pytest.ini_options]
 testpaths = ["03_tests"]
 markers = [
-    "data: needs the sample datasets in 08_datasets/",
+    "data: needs the sample datasets in 08_data/sample/",
     "movingpandas: needs the optional movingpandas dependency",
 ]
 

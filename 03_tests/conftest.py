@@ -3,7 +3,7 @@
 Everything here is synthetic: a field whose true value is known everywhere, so
 an interpolator's answer can be checked exactly rather than eyeballed.  Tests
 that need the real sample data carry the ``data`` marker and skip when
-``08_datasets/`` is absent.
+``08_data/sample/`` is absent.
 """
 
 import os
@@ -40,7 +40,7 @@ def station_frame(grid_stations):
 def pytest_collection_modifyitems(config, items):
     if DATASETS.exists():
         return
-    skip = pytest.mark.skip(reason="sample data in 08_datasets/ not present")
+    skip = pytest.mark.skip(reason="sample data in 08_data/sample/ not present")
     for item in items:
         if "data" in item.keywords:
             item.add_marker(skip)

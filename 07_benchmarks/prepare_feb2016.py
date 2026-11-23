@@ -24,8 +24,8 @@ from pyproj import Transformer
 from scipy.spatial import cKDTree
 
 ROOT = sys.argv[1] if len(sys.argv) > 1 else str(Path(__file__).resolve().parents[1])
-SRC = f"{ROOT}/09_data/zenodo_1167595"
-OUT = f"{ROOT}/09_data/cadp_feb2016.pkl"
+SRC = f"{ROOT}/08_data/zenodo_1167595"
+OUT = f"{ROOT}/08_data/cache/cadp_feb2016.pkl"
 LO, HI = pd.Timestamp("2016-02-01").value // 10**9, pd.Timestamp("2016-03-01").value // 10**9
 to_utm = Transformer.from_crs(4326, 32630, always_xy=True)
 t0 = time.time()
@@ -135,5 +135,6 @@ NAMES = {  # the archive's coded names -> what they measure
     "speed": "speed_over_ground", "cog": "course_over_ground", "heading": "true_heading",
     "rateofturn": "rate_of_turn", "dpt": "bottom_depth", "hs": "wave_height",
     "dir": "wave_direction", "wlv": "sea_level", "dist_to_grid_m": "distance_to_grid_m"}
+os.makedirs(os.path.dirname(OUT), exist_ok=True)
 a[cols].rename(columns=NAMES).to_pickle(OUT)
 print(f"wrote {OUT} ({os.path.getsize(OUT) / 1e6:.0f} MB, {time.time() - t0:.0f}s)")

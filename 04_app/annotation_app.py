@@ -312,16 +312,16 @@ overview_tab = pn.Column(
 # ------------------------------------------------------------ 1. data tab
 
 traj_path = pn.widgets.TextInput(
-    name="Trajectory file", value="08_datasets/AIS/AIS_DLT_UTM.shp")
+    name="Trajectory file", value="08_data/sample/AIS/AIS_DLT_UTM.shp")
 station_path = pn.widgets.TextInput(
     name="Context station file",
-    value="08_datasets/context/Weather/Weather_Observation_UTM.shp")
+    value="08_data/sample/Weather/Weather_Observation_UTM.shp")
 traj_dict_path = pn.widgets.TextInput(
     name="Trajectory field descriptions (optional)",
-    value="08_datasets/AIS/AIS_parameters.txt")
+    value="08_data/sample/AIS/AIS_parameters.txt")
 station_dict_path = pn.widgets.TextInput(
     name="Context field descriptions (optional)",
-    value="08_datasets/context/Weather/Weather_parameters.txt")
+    value="08_data/sample/Weather/Weather_parameters.txt")
 load_button = pn.widgets.Button(name="Load", button_type="primary", width=120)
 dictionary_status = pn.Column()
 

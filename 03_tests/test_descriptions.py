@@ -49,5 +49,5 @@ def test_unreadable_file_is_an_empty_mapping(tmp_path):
 
 @pytest.mark.data
 def test_sample_weather_dictionary():
-    fields = parse_data_dictionary(DATASETS / "context" / "Weather" / "Weather_parameters.txt")
+    fields = parse_data_dictionary(DATASETS / "Weather" / "Weather_parameters.txt")
     assert {"Ff", "T", "Td"} <= set(fields)

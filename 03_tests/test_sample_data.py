@@ -14,7 +14,7 @@ pytestmark = pytest.mark.data
 @pytest.fixture(scope="module")
 def weather():
     gpd = pytest.importorskip("geopandas")
-    return gpd.read_file(DATASETS / "context" / "Weather" / "Weather_Observation_UTM.shp")
+    return gpd.read_file(DATASETS / "Weather" / "Weather_Observation_UTM.shp")
 
 
 @pytest.fixture(scope="module")

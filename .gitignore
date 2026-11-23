@@ -67,13 +67,15 @@ desktop.ini
 01_docs/papers/*context-aware approach for vessels*
 
 # ---------------------------------------------------------------------------
-# Downloaded data (09_data/) and generated output (10_results/)
+# Data (08_data/) and generated output (10_results/)
 #
 # Large, licence-restricted, and regenerated on every run. Only the README
-# that says what belongs in each folder is committed.
+# that says what belongs in each folder is committed, plus the data licences
+# and the 24-hour sample in 08_data/sample/ (re-included at the end of this file).
 # ---------------------------------------------------------------------------
-09_data/*
-!09_data/README.md
+08_data/*
+!08_data/README.md
+!08_data/LICENSE.md
 10_results/*
 !10_results/README.md
 
@@ -81,7 +83,7 @@ desktop.ini
 # Data files anywhere else
 #
 # Movement and context datasets are large and often licence-restricted, so they
-# are not committed. The sample archives in 08_datasets/ are the exception: the
+# are not committed. The sample archives in 08_data/sample/ are the exception: the
 # tutorials, tests and app point at them out of the box, so they are
 # force-included below. Point tests at small synthetic fixtures rather than
 # adding real data.
@@ -105,4 +107,5 @@ desktop.ini
 *.qix
 
 # The sample datasets the tutorials, tests and app depend on.
-!08_datasets/**
+!08_data/sample/
+!08_data/sample/**

@@ -7,7 +7,7 @@ Everything comes from one Zenodo record:
     and Reconnaissance. Data in Brief 25, 104141. doi:10.1016/j.dib.2019.104141
     Data: doi:10.5281/zenodo.1167595 -- https://zenodo.org/records/1167595
 
-The files go to ``09_data/zenodo_1167595/``, which git ignores. Each archive is
+The files go to ``08_data/zenodo_1167595/``, which git ignores. Each archive is
 checked against the MD5 checksum published on the record, then only the files
 the code reads are extracted. An interrupted download resumes where it stopped,
 and anything already in place is skipped, so running the script again is safe.
@@ -49,7 +49,7 @@ import zipfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-DATA = ROOT / "09_data" / "zenodo_1167595"
+DATA = ROOT / "08_data" / "zenodo_1167595"
 RECORD = "https://zenodo.org/records/1167595/files/"
 
 MONTHS = {"oct": "october", "nov": "november", "dec": "december",
@@ -183,7 +183,7 @@ def report(names: list[str], months: list[str]) -> bool:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
-        description="Download the Zenodo data (doi:10.5281/zenodo.1167595) into 09_data/.",
+        description="Download the Zenodo data (doi:10.5281/zenodo.1167595) into 08_data/zenodo_1167595/.",
         epilog="Full guide: 05_tutorials/00_getting_the_data.md")
     parser.add_argument("target", nargs="?", default="all", choices=sorted(TARGETS),
                         help="annotation: tutorial 1; cadp: tutorial 2 and 07_benchmarks; "

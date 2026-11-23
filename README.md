@@ -56,8 +56,7 @@ publisher via the DOI. The implementation does not depend on having them.
 | [`05_tutorials/`](05_tutorials/) | notebooks, in order, and the data guide and downloader (`00_getting_the_data.md`, `download_data.py`) |
 | [`06_workflows/`](06_workflows/) | scripts that run a method over the whole archive |
 | [`07_benchmarks/`](07_benchmarks/) | temporary research scripts, to be removed |
-| [`08_datasets/`](08_datasets/) | the 24-hour sample data, committed |
-| `09_data/` | downloaded archives, not committed ([`README`](09_data/README.md); how to get them: [`00_getting_the_data.md`](05_tutorials/00_getting_the_data.md)) |
+| [`08_data/`](08_data/) | all data ([`README`](08_data/README.md)): the 24-hour sample in `sample/`, committed; the downloaded archive in `zenodo_1167595/` and built files in `cache/`, not committed (how to get them: [`00_getting_the_data.md`](05_tutorials/00_getting_the_data.md)) |
 | `10_results/` | everything the notebooks and workflows write, not committed ([`README`](10_results/README.md)) |
 
 ---
@@ -173,7 +172,7 @@ it applies.
 
 ### Sample data, included
 
-`08_datasets/` holds a matched 24-hour extract that the tutorial and app both use
+`08_data/sample/` holds a matched 24-hour extract that the tutorial and app both use
 out of the box:
 
 | | | |
@@ -185,7 +184,7 @@ Both cover 2016-02-05 01:00 → 2016-02-06 01:00 UTC, projected to UTM zone 30N.
 
 **These carry their own licences**, stricter than the code's — the AIS
 extract is CC BY-NC-SA 4.0, so no commercial use. See
-[`08_datasets/LICENSE.md`](08_datasets/LICENSE.md). Nothing in `catraj` depends on
+[`08_data/LICENSE.md`](08_data/LICENSE.md). Nothing in `catraj` depends on
 them; point it at your own data and the question does not arise.
 
 ### The full archive, downloaded
@@ -202,7 +201,7 @@ python 05_tutorials/download_data.py --check      # what is present
 
 The script uses only the standard library. It verifies each archive against
 the checksum Zenodo publishes, resumes interrupted downloads, and extracts into
-`09_data/zenodo_1167595/`, which git ignores.
+`08_data/zenodo_1167595/`, which git ignores.
 [`05_tutorials/00_getting_the_data.md`](05_tutorials/00_getting_the_data.md)
 covers everything else: which tutorial needs which files, downloading by hand,
 disk space, the order to run things in, troubleshooting, and the licences.
@@ -238,6 +237,6 @@ extends. `CITATION.cff` has both in machine-readable form.
 contributed upstream.
 
 **Data:** third-party, with its own terms. See
-[`08_datasets/LICENSE.md`](08_datasets/LICENSE.md) for the sample, and section 7
+[`08_data/LICENSE.md`](08_data/LICENSE.md) for the sample, and section 7
 of [`00_getting_the_data.md`](05_tutorials/00_getting_the_data.md) for the
 downloaded archive.

@@ -27,7 +27,7 @@ sys.path.insert(0, f"{ROOT}/src")
 from catraj.compression import Context, cadp_select, context_errors, douglas_peucker, dtw
 from catraj.compression.cadp import _refine
 
-a = pd.read_pickle(f"{ROOT}/09_data/cadp_feb2016.pkl")
+a = pd.read_pickle(f"{ROOT}/08_data/cache/cadp_feb2016.pkl")
 N = len(a)
 mm = a.mmsi.to_numpy()
 B = np.r_[np.flatnonzero(np.r_[True, mm[1:] != mm[:-1]]), N]
