@@ -13,6 +13,8 @@ from catraj.compression import (
     segment_crossings,
 )
 
+from helpers import DATASETS
+
 
 def _reference_cpls(x, y, epsilon, barrier):
     """Algorithm 1 read literally: one intersection test per candidate point."""
@@ -389,3 +391,25 @@ def test_cpls_compress_movingpandas_objects():
     out_coll = cpls_compress(coll, 150.0, barriers)
     assert isinstance(out_coll, mpd.TrajectoryCollection)
     assert len(out_coll.trajectories) == len(coll.trajectories) == 2
+
+
+@pytest.mark.data
+def test_cpls_on_the_sample_fleet():
+    ais = gpd.read_file(DATASETS / "AIS" / "AIS_DLT_UTM.shp")
+    ais = ais.sort_values(["sourcemmsi", "t"], kind="stable")
+    land = Barriers(gpd.read_file(DATASETS / "Coastline" / "Coastline_UTM.shp"))
+    out = cpls_compress(ais, 1_000, land, by="sourcemmsi")
+
+    dp_index, dp_new, cpls_new = [], 0, 0
+    for _, g in ais.groupby("sourcemmsi", sort=False):
+        x, y = g.geometry.x.to_numpy(), g.geometry.y.to_numpy()
+        dp = douglas_peucker(x, y, 1_000)
+        dp_index.extend(g.index[dp])
+        dp_new += segment_crossings(x, y, land, keep=dp, new_only=True).sum()
+        cpls_keep = g.index.isin(out.index)
+        cpls_new += segment_crossings(x, y, land, keep=cpls_keep, new_only=True).sum()
+
+    assert dp_new > 0
+    assert cpls_new == 0
+    assert len(dp_index) <= len(out) < len(ais)
+    assert set(dp_index) <= set(out.index)

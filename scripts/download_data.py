@@ -14,16 +14,17 @@ and anything already in place is skipped, so running the script again is safe.
 
 Usage, from the repository root, in the ``catraj`` environment::
 
-    python scripts/download_data.py                # everything (~773 MB download)
+    python scripts/download_data.py                # everything (~825 MB download)
     python scripts/download_data.py annotation     # tutorial 1 only (~203 MB)
     python scripts/download_data.py cadp           # tutorial 2 and the benchmarks (~771 MB)
+    python scripts/download_data.py cpls           # the full coastline for tutorial 3 (~53 MB)
     python scripts/download_data.py --check        # report what is present, download nothing
 
 Options::
 
     --months feb,jan    sea-state months to extract (oct nov dec jan feb mar, or all);
                         the tutorials need only feb
-    --remove-zips       delete each archive once extracted (saves ~770 MB; a later
+    --remove-zips       delete each archive once extracted (saves ~820 MB; a later
                         run, or DOWNLOAD = True in a notebook, downloads it again)
 
 Only the Python standard library is used, so the script runs before anything
@@ -33,7 +34,10 @@ Licences: the AIS data is CC BY-NC-SA 4.0 (attribute NARI, Brest; no
 commercial use; derived data under the same licence). Sea state (SHOM-IFREMER,
 WAVEWATCH III) is public with citation mandatory: Boudière et al. (2013),
 doi:10.1016/j.ijome.2013.11.010. Weather (rp5.ua, from Met Office / NOAA data)
-is public; cite the source.
+is public; cite the source. The European coastline (EEA, "EEA coastline for
+analysis") may be re-used free of charge for commercial and non-commercial
+purposes, provided the source is acknowledged (Copyright holder: DG ENV,
+http://www.eea.europa.eu/legal/copyright).
 """
 
 from __future__ import annotations
@@ -70,6 +74,11 @@ ARCHIVES = {
     "[E1] Ocean Conditions.zip": dict(
         md5="20a1c8f8a6bbbd9bdf9821f938f22add", size=569_846_491, folder="E1_ocean",
         members=["README_parameters.txt"]),          # + oc_<month>.csv, from --months
+    "[C2] European Coastline.zip": dict(
+        md5="52036af60c8427fcda4b867c706bf649", size=52_613_917, folder="C2_European_Coastline",
+        members=["Europe Coastline (Polygone).shp", "Europe Coastline (Polygone).shx",
+                 "Europe Coastline (Polygone).dbf", "Europe Coastline (Polygone).prj",
+                 "README_parameters.txt"]),
 }
 
 # What each part of the repository reads.
@@ -77,8 +86,10 @@ TARGETS = {
     "annotation": ["[P1] AIS Data.zip", "[P1] AIS Status, Codes and Types.zip",
                    "[E2] Weather Conditions.zip"],
     "cadp": ["[P1] AIS Data.zip", "[E1] Ocean Conditions.zip"],
+    "cpls": ["[C2] European Coastline.zip"],
 }
-TARGETS["all"] = list(dict.fromkeys(TARGETS["annotation"] + TARGETS["cadp"]))
+TARGETS["all"] = list(dict.fromkeys(
+    TARGETS["annotation"] + TARGETS["cadp"] + TARGETS["cpls"]))
 
 
 def zip_path(name: str) -> Path:
@@ -187,7 +198,8 @@ def main(argv: list[str] | None = None) -> int:
         epilog="Full guide: docs/getting_the_data.md")
     parser.add_argument("target", nargs="?", default="all", choices=sorted(TARGETS),
                         help="annotation: tutorial 1; cadp: tutorial 2 and the benchmarks; "
-                             "all (default): both")
+                             "cpls: the full coastline for tutorial 3; "
+                             "all (default): everything")
     parser.add_argument("--months", default="feb",
                         help="sea-state months to extract: comma-separated from "
                              "oct,nov,dec,jan,feb,mar, or 'all' (default: feb)")
@@ -213,6 +225,7 @@ def main(argv: list[str] | None = None) -> int:
     print(f"to download: {total / 1e6:,.0f} MB")
     print("The AIS data is CC BY-NC-SA 4.0: attribute NARI, no commercial use, "
           "share derived data alike.")
+    print("The coastline is EEA data: free to re-use, acknowledge the source.")
     DATA.mkdir(parents=True, exist_ok=True)
     for name in names:
         fetch(name, months, args.remove_zips)

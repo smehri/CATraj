@@ -4,8 +4,9 @@
 data in this folder comes from third parties and carries its own terms, which
 are stricter. Read them before redistributing or using this data.
 
-This file covers the 24-hour sample committed in `sample/`. Each dataset's own
-parameter file (`AIS_parameters.txt`, `Weather_parameters.txt`) carries the
+This file covers the sample committed in `sample/`. Each dataset's own
+parameter file (`AIS_parameters.txt`, `Weather_parameters.txt`,
+`Coastline_parameters.txt`) carries the
 full field descriptions and provenance.
 
 The full archive you download into `zenodo_1167595/` comes from the same
@@ -48,6 +49,23 @@ Coastal weather observations.
 | Coverage | 16 stations, longitude −10.00 to 0.00, latitude 45.00 to 51.00 |
 | Full dataset | ~75,000 hourly observations, 2015-10-01 to 2016-03-31 UTC |
 | Extract here | 400 observations, 2016-02-05 01:00 to 2016-02-06 01:00 UTC |
+
+---
+
+## Coastline — `sample/Coastline/`
+
+Land polygons, used as barriers by CPLS compression.
+
+| | |
+|---|---|
+| Source | European Environment Agency, "EEA coastline for analysis" (version 08/07/2013), obtained through the Zenodo record [doi:10.5281/zenodo.1167595](https://doi.org/10.5281/zenodo.1167595) |
+| Licence | **EEA standard re-use policy**: re-use for commercial or non-commercial purposes is permitted free of charge, **provided the source is acknowledged**. Copyright holder: Directorate-General for Environment (DG ENV). See <http://www.eea.europa.eu/legal/copyright> |
+| Coverage | Europe |
+| Full dataset | 71,514 land polygons (`Europe Coastline (Polygone).shp`, EPSG:3035) |
+| Extract here | 175 polygons, 12,049 vertices, clipped to the sample AIS area plus 5 km and reprojected to EPSG:32630 |
+
+The rule here is attribution only: this layer is not under the AIS licence,
+and the NC and SA terms above do not apply to it.
 
 ---
 
