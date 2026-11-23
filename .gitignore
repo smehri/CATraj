@@ -3,7 +3,6 @@ __pycache__/
 *.py[cod]
 *$py.class
 
-
 # Distribution / packaging
 build/
 dist/
@@ -46,51 +45,50 @@ desktop.ini
 .ipynb_checkpoints/
 
 # ---------------------------------------------------------------------------
-# Generated output
-#
-# Everything below is produced by running the code, and is regenerated on the
-# next run. Committing it would put megabytes of derived data under version
-# control and make every rerun show as a diff.
-# ---------------------------------------------------------------------------
-
 # Working notes
 #
-# CLAUDE.md is the author's own working document: the method extracted
-# from the papers, the decisions taken where they are ambiguous, and the
-# reasoning behind them. It is not part of the published package.
-src/catraj/annotation/CLAUDE.md
+# CLAUDE.md is the author's own working document: the method extracted from
+# the papers, the decisions taken where they are ambiguous, and the reasoning
+# behind them. It is not part of the published package.
+# ---------------------------------------------------------------------------
+02_src/catraj/**/CLAUDE.md
 
-# Papers
+# ---------------------------------------------------------------------------
+# Papers (01_docs/papers/)
 #
-# The open-access source papers (CC BY) are committed under papers/, so the
-# method each module implements can be checked against its source.
+# The open-access source papers (CC BY) are committed, so the method each
+# module implements can be checked against its source.
 #
 # The 2023 Ocean Engineering paper is NOT: it is an Elsevier subscription
-# article and this repository is public. README.md links it by DOI. The
-# patterns below keep it out even if a copy is dropped into the folder.
-papers/*Ocean-Engineering*
-papers/*context-aware approach for vessels*
-
-# Results written by the tutorial notebook
-tutorials/results_trajectory_annotation/
-
-# Files exported from the app
-app/exports/
+# article and this repository is public. README.md links it by DOI. These
+# patterns keep it out even if a copy is dropped into the folder.
+# ---------------------------------------------------------------------------
+01_docs/papers/*Ocean-Engineering*
+01_docs/papers/*context-aware approach for vessels*
 
 # ---------------------------------------------------------------------------
-# Data
+# Downloaded data (09_data/) and generated output (10_results/)
+#
+# Large, licence-restricted, and regenerated on every run. Only the README
+# that says what belongs in each folder is committed.
+# ---------------------------------------------------------------------------
+09_data/*
+!09_data/README.md
+10_results/*
+!10_results/README.md
+
+# ---------------------------------------------------------------------------
+# Data files anywhere else
 #
 # Movement and context datasets are large and often licence-restricted, so they
-# are not committed. The sample archives under datasets/ are the exception:
-# the tutorial and the app both point at them out of the box, so they are
-# force-included below.
-#
-# Point tests at small synthetic fixtures rather than adding real data here.
+# are not committed. The sample archives in 08_datasets/ are the exception: the
+# tutorials, tests and app point at them out of the box, so they are
+# force-included below. Point tests at small synthetic fixtures rather than
+# adding real data.
 # ---------------------------------------------------------------------------
-
-data/
 *.csv
 *.parquet
+*.pkl
 *.nc
 *.h5
 *.hdf5
@@ -106,5 +104,5 @@ data/
 *.cpg
 *.qix
 
-# The sample datasets the tutorial and app depend on.
-!datasets/**
+# The sample datasets the tutorials, tests and app depend on.
+!08_datasets/**

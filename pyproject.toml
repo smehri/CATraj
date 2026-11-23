@@ -59,7 +59,7 @@ Repository = "https://github.com/smehri/catraj"
 Issues = "https://github.com/smehri/catraj/issues"
 
 [tool.setuptools.packages.find]
-where = ["src"]
+where = ["02_src"]
 
 [tool.setuptools.package-data]
 catraj = ["py.typed"]
@@ -67,9 +67,9 @@ catraj = ["py.typed"]
 "catraj.annotation" = ["*.svg"]
 
 [tool.pytest.ini_options]
-testpaths = ["tests"]
+testpaths = ["03_tests"]
 markers = [
-    "data: needs the sample datasets in datasets/",
+    "data: needs the sample datasets in 08_datasets/",
     "movingpandas: needs the optional movingpandas dependency",
 ]
 

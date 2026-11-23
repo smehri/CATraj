@@ -33,15 +33,32 @@ releases.
 
 ## Papers
 
-The two open-access papers are in [`papers/`](papers/), so each module can be
+The two open-access papers are in [`01_docs/papers/`](01_docs/papers/), so each module can be
 checked against the method it implements; the 2023 paper is available from its
 publisher via the DOI. The implementation does not depend on having them.
 
 | Year | Paper | | |
 |---|---|---|---|
-| 2025 | *A Novel Context-Aware Douglas–Peucker (CADP) Trajectory Compression Method.* ISPRS Int. J. Geo-Inf., 14(2), 58. | [pdf](papers/2025_Mehri_IJGI_CADP.pdf) | [doi](https://doi.org/10.3390/ijgi14020058) |
+| 2025 | *A Novel Context-Aware Douglas–Peucker (CADP) Trajectory Compression Method.* ISPRS Int. J. Geo-Inf., 14(2), 58. | [pdf](01_docs/papers/2025_Mehri_IJGI_CADP.pdf) | [doi](https://doi.org/10.3390/ijgi14020058) |
 | 2023 | *A context-aware approach for vessels' trajectory prediction.* Ocean Engineering, 282, 114916. | — | [doi](https://doi.org/10.1016/j.oceaneng.2023.114916) |
-| 2021 | *A Contextual Hybrid Model for Vessel Movement Prediction.* IEEE Access, 9, 45600–45613. | [pdf](papers/2021_Mehri_IEEE-Access_Contextual-Hybrid-Model_CPLS-CLSTM.pdf) | [doi](https://doi.org/10.1109/ACCESS.2021.3066463) |
+| 2021 | *A Contextual Hybrid Model for Vessel Movement Prediction.* IEEE Access, 9, 45600–45613. | [pdf](01_docs/papers/2021_Mehri_IEEE-Access_Contextual-Hybrid-Model_CPLS-CLSTM.pdf) | [doi](https://doi.org/10.1109/ACCESS.2021.3066463) |
+
+---
+
+## Repository layout
+
+| folder | what it holds |
+|---|---|
+| [`01_docs/`](01_docs/) | the source papers (open-access ones) |
+| [`02_src/catraj/`](02_src/catraj/) | the library: `annotation`, `compression` |
+| [`03_tests/`](03_tests/) | the test suite (`pytest`) |
+| [`04_app/`](04_app/) | the interactive annotation app |
+| [`05_tutorials/`](05_tutorials/) | notebooks, in order |
+| [`06_workflows/`](06_workflows/) | scripts that run a method over the whole archive |
+| [`07_benchmarks/`](07_benchmarks/) | temporary research scripts, to be removed |
+| [`08_datasets/`](08_datasets/) | the 24-hour sample data, committed |
+| `09_data/` | downloaded archives, not committed ([`README`](09_data/README.md)) |
+| `10_results/` | everything the notebooks and workflows write, not committed ([`README`](10_results/README.md)) |
 
 ---
 
@@ -51,7 +68,7 @@ Requires Python ≥ 3.10. The geospatial stack installs far more reliably from
 conda-forge, especially on Windows:
 
 ```bash
-conda create -n catraj -c conda-forge python=3.11 geopandas scipy scikit-learn pandas panel hvplot geoviews-core movingpandas pytest
+conda create -n catraj -c conda-forge python=3.11 geopandas scipy scikit-learn pandas panel hvplot geoviews-core movingpandas stonesoup ipykernel pytest
 conda activate catraj
 
 git clone https://github.com/smehri/catraj
@@ -59,7 +76,22 @@ cd catraj
 pip install -e ".[app]"
 ```
 
-Omit `[app]` for the library alone.
+Omit `[app]` for the library alone. `stonesoup` is only an optional extra of
+MovingPandas, which warns on import without it.
+
+To run the tutorials from an editor (VS Code, JupyterLab) without activating
+the environment first, register it as a kernel and pick **Python (catraj)**.
+The kernel carries the variables `conda activate` would set, so GDAL finds its
+data files:
+
+```bash
+python -m ipykernel install --user --name catraj --display-name "Python (catraj)" ^
+    --env GDAL_DATA "%CONDA_PREFIX%\Library\share\gdal" ^
+    --env PROJ_DATA "%CONDA_PREFIX%\Library\share\proj"
+```
+
+(On Linux or macOS: `$CONDA_PREFIX/share/gdal` and `$CONDA_PREFIX/share/proj`,
+with `\` for line continuation.)
 
 ---
 
@@ -69,20 +101,28 @@ Omit `[app]` for the library alone.
 import geopandas as gpd, pandas as pd
 from catraj.annotation import IDW, Spline, annotate_points
 
-obs = gpd.read_file("weather.shp")
+# Source files often use coded names; give columns names that say what they measure.
+obs = gpd.read_file("weather.shp").rename(columns={"Ff": "wind_speed", "local_time": "unix_time"})
 stations = pd.DataFrame({
     "x": obs.geometry.x, "y": obs.geometry.y,
-    "t": obs.local_time.astype(float),
-    "value": obs.Ff.astype(float),
+    "t": obs.unix_time.astype(float),
+    "value": obs.wind_speed.astype(float),
 })
 
-traj = gpd.read_file("trajectories.shp")
+traj = gpd.read_file("trajectories.shp").rename(
+    columns={"sourcemmsi": "mmsi", "t": "unix_time", "speedoverg": "speed_over_ground"})
 traj["wind_speed"] = annotate_points(
     stations,
-    traj.geometry.x, traj.geometry.y, traj.t.astype(float),
+    traj.geometry.x, traj.geometry.y, traj.unix_time.astype(float),
     spatial_method=IDW(power=2), temporal_method=Spline(),
 )
 ```
+
+Millions of positions are fine: long inputs are processed in time blocks
+(`chunk_epochs`), DLT is evaluated for all positions at once, and `n_jobs=-1`
+spreads the blocks over every core (as it spreads epochs in
+`evaluate_spatial`). The whole six-month sample archive, 18 million positions,
+annotates in under half a minute per variable on 32 cores.
 
 Context attaches as ordinary columns, so it survives the `.iloc` slicing that
 trajectory compression performs — a compressed trajectory keeps the context of
@@ -97,8 +137,8 @@ from catraj.compression import compress, compression_ratio, dtw
 
 small = compress(
     traj, epsilon=1_000,                          # metres, for Douglas–Peucker
-    thresholds={"wind_speed": 0.5, "speedoverg": 1.0},
-    time_column="t", by="sourcemmsi",             # or pass a movingpandas Trajectory
+    thresholds={"wind_speed": 0.5, "speed_over_ground": 1.0},
+    time_column="unix_time", by="mmsi",           # or pass a movingpandas Trajectory
 )
 compression_ratio(len(small), len(traj)), dtw(traj, small)
 ```
@@ -112,13 +152,15 @@ There is also an interactive app, which compares interpolation methods by
 cross-validation before annotating:
 
 ```bash
-python app/run_app.py          # or double-click "Run Annotation App.bat"
+python 04_app/run_app.py       # or double-click 04_app/"Run Annotation App.bat"
 ```
 
 | | |
 |---|---|
-| [`tutorials/1-trajectory-annotation.ipynb`](tutorials/1-trajectory-annotation.ipynb) | a worked example on real data, with interactive plots |
-| [`app/README.md`](app/README.md) | the app |
+| [`05_tutorials/01_trajectory_annotation.ipynb`](05_tutorials/01_trajectory_annotation.ipynb) | annotation on real data, from the 24-hour sample up to the whole six-month archive, with interactive plots |
+| [`05_tutorials/02_cadp_compression.ipynb`](05_tutorials/02_cadp_compression.ipynb) | CADP on the paper's data (AIS + WAVEWATCH III sea state, Feb 2016): download links and licences, both modes, the paper's experiments |
+| [`04_app/README.md`](04_app/README.md) | the app |
+| [`06_workflows/README.md`](06_workflows/README.md) | scripts that process the whole archive end to end |
 
 The modules carry the method in their docstrings: `help(catraj.annotation)`
 for the overview, and `help` on any interpolator for what it does and when
@@ -128,7 +170,7 @@ it applies.
 
 ## Sample data
 
-`datasets/` holds a matched 24-hour extract that the tutorial and app both use
+`08_datasets/` holds a matched 24-hour extract that the tutorial and app both use
 out of the box:
 
 | | | |
@@ -140,7 +182,7 @@ Both cover 2016-02-05 01:00 → 2016-02-06 01:00 UTC, projected to UTM zone 30N.
 
 **These carry their own licences**, stricter than the code's — the AIS
 extract is CC BY-NC-SA 4.0, so no commercial use. See
-[`datasets/LICENSE.md`](datasets/LICENSE.md). Nothing in `catraj` depends on
+[`08_datasets/LICENSE.md`](08_datasets/LICENSE.md). Nothing in `catraj` depends on
 them; point it at your own data and the question does not arise.
 
 ---
@@ -172,4 +214,4 @@ extends. `CITATION.cff` has both in machine-readable form.
 contributed upstream.
 
 **Sample data:** third-party, with its own terms. See
-[`datasets/LICENSE.md`](datasets/LICENSE.md).
+[`08_datasets/LICENSE.md`](08_datasets/LICENSE.md).
