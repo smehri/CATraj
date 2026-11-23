@@ -25,7 +25,7 @@ added in later releases.
 |---|---|---|---|
 | **Annotation** | Attaches context observed at coarse resolution to high-frequency trajectory points. Spatial interpolation across observation stations, then temporal interpolation through time. | 2023 | **implemented** |
 | **CADP** | Context-Aware Douglas–Peucker. Extends DP with three context domains — environmental, internal, semantic — retaining points that carry contextual information a purely spatial criterion would discard. | 2025 | **implemented** |
-| **CPLS** | Context-aware Piecewise Linear Segmentation. Guarantees logical consistency, e.g., a compressed (simplified) vessel trajectory may not cross the shoreline. | 2021 | **implemented** |
+| **CPLS** | Context-aware Piecewise Linear Segmentation. Guarantees logical consistency, e.g., a compressed (simplified) vessel trajectory may not cross the shoreline, and keeps its topological signature (barriers, direction, self-intersections). | 2021 | **implemented** |
 | **2stage-CPLS** | CPLS plus stay-point preservation. | 2021 | planned |
 | **CLSTM** | Context-aware LSTM. Routes each trajectory to a per-type network, avoiding Simpson's paradox in a single global model. | 2021, 2023 | planned |
 
@@ -148,9 +148,13 @@ are kept; `help(catraj.compression.cadp)` explains the difference.
 
 CPLS also starts from Douglas–Peucker, but it protects topology instead of
 context: it keeps any point whose removal would change the trajectory's
-topological signature against a barrier such as a shoreline -- a crossing the
-original did not have, or an island moved from one side of the track to the
-other, tested with Tienaah et al.'s nine-cell direction model. Barriers
+topological signature, as Tienaah et al. define it, through five relations,
+all on by default. Two are about a barrier such as a shoreline: the DE-9IM
+relation with each neighbouring barrier must stay the same (no crossing the
+original did not have), and so must the nine-cell direction model (an island
+stays on its side of the track). Three are about the track itself: it may not
+gain a self-intersection (`avoid_self_intersection`), lose one
+(`keep_self_intersection`), or fold back on itself (`inversion`). Barriers
 are shapely geometries (lines or polygons) or a `GeoDataFrame`, in the same
 projected CRS as the positions:
 
@@ -165,6 +169,20 @@ The result is always a superset of the Douglas–Peucker result, introduces no
 crossing that the original trajectory did not already have, and leaves every
 nearby barrier on the side it was;
 `help(catraj.compression.cpls)` lists the decisions behind it.
+
+The self-intersection and inversion relations act on the track alone, and on
+raw AIS they are expensive: the GPS jitter of a moored vessel crosses itself
+thousands of times, and keeping those crossings keeps most of its points. On
+the 24-hour sample at 1 km, the barrier relations alone keep 607 of 106,894
+points, all five 43,074 (about 40 s instead of 3 s). The paper's two-stage
+CPLS, not implemented yet, collapses stay points first and removes that
+jitter. Until then, switch relations off by keyword:
+
+```python
+safe = cpls_compress(traj, epsilon=1_000, barriers=land, by="mmsi",
+                     keep_self_intersection=False, avoid_self_intersection=False,
+                     inversion=False)          # barrier relations only
+```
 
 There is also an interactive app, which compares interpolation methods by
 cross-validation before annotating:

@@ -12,8 +12,9 @@ abstract: >-
   conditions the moving object passed through -- and Context-Aware
   Douglas-Peucker (CADP) compression, which keeps the points that carry that
   context, and Context-aware Piecewise Linear Segmentation (CPLS) compression,
-  which keeps the points that stop the simplified trajectory crossing a
-  barrier such as a shoreline or passing it on the other side.
+  which keeps the points whose removal would change the trajectory's
+  topological signature: a crossing of a barrier such as a shoreline, passing
+  it on the other side, or a changed self-intersection.
 type: software
 authors:
   - family-names: Mehri
