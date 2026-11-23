@@ -147,8 +147,10 @@ every dropped point is guaranteed within its thresholds and far fewer points
 are kept; `help(catraj.compression.cadp)` explains the difference.
 
 CPLS also starts from Douglas–Peucker, but it protects topology instead of
-context: it keeps any point whose removal would make the simplified trajectory
-cross a barrier, such as a shoreline, that the original did not cross. Barriers
+context: it keeps any point whose removal would change the trajectory's
+topological signature against a barrier such as a shoreline -- a crossing the
+original did not have, or an island moved from one side of the track to the
+other, tested with Tienaah et al.'s nine-cell direction model. Barriers
 are shapely geometries (lines or polygons) or a `GeoDataFrame`, in the same
 projected CRS as the positions:
 
@@ -159,8 +161,9 @@ land = gpd.read_file("data/sample/Coastline/Coastline_UTM.shp")   # land polygon
 safe = cpls_compress(traj, epsilon=1_000, barriers=land, by="mmsi")
 ```
 
-The result is always a superset of the Douglas–Peucker result and introduces no
-crossing that the original trajectory did not already have;
+The result is always a superset of the Douglas–Peucker result, introduces no
+crossing that the original trajectory did not already have, and leaves every
+nearby barrier on the side it was;
 `help(catraj.compression.cpls)` lists the decisions behind it.
 
 There is also an interactive app, which compares interpolation methods by

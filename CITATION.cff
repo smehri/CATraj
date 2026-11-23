@@ -13,7 +13,7 @@ abstract: >-
   Douglas-Peucker (CADP) compression, which keeps the points that carry that
   context, and Context-aware Piecewise Linear Segmentation (CPLS) compression,
   which keeps the points that stop the simplified trajectory crossing a
-  barrier such as a shoreline.
+  barrier such as a shoreline or passing it on the other side.
 type: software
 authors:
   - family-names: Mehri

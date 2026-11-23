@@ -12,25 +12,77 @@ from catraj.compression import (
     douglas_peucker,
     segment_crossings,
 )
+from catraj.compression.cpls import _direction_cells
 
 from helpers import DATASETS
 
 
-def _reference_cpls(x, y, epsilon, barrier):
-    """Algorithm 1 read literally: one intersection test per candidate point."""
+_FAR = 1e9
+
+
+def _reference_cells(line, box):
+    """Nine-cell signature by clipping the line with each cell's rectangle.
+
+    Independent of the library's parametric computation: a cell counts when
+    the part of the line inside it, less the cell's boundary, has length.
+    """
+    xmin, ymin, xmax, ymax = box
+    xs, ys = (-_FAR, xmin, xmax, _FAR), (-_FAR, ymin, ymax, _FAR)
+    cells = set()
+    for i in range(3):
+        for j in range(3):
+            if xs[i] == xs[i + 1] or ys[j] == ys[j + 1]:
+                continue  # a degenerate box has empty middle cells
+            cell = shapely.box(xs[i], ys[j], xs[i + 1], ys[j + 1])
+            inside = line.intersection(cell).difference(cell.boundary)
+            if inside.length > 1e-6:
+                cells.add((i, j))
+    return cells
+
+
+def _reference_cpls(x, y, epsilon, barriers):
+    """Algorithm 1 read literally, with Tienaah's signature (D3-D5).
+
+    One test per candidate point.  The chord from the last retained point
+    ``a`` to ``j + 1`` replaces the sub-path ``a .. j + 1``; it is consistent
+    if it creates no intersection the sub-path lacks, and if every barrier
+    part meeting the sub-path's convex hull sees the same nine cells crossed
+    by both, the cells drawn around that part's extent inside the hull.
+    """
+    x, y = np.asarray(x, float), np.asarray(y, float)
     n = len(x)
+    parts = [p for g in barriers for p in shapely.get_parts(g) if not p.is_empty]
     dp = douglas_peucker(x, y, epsilon)
     keep = dp.copy()
 
-    def seg(i, j):
+    def line(i, j):
+        return shapely.LineString(np.column_stack([x[i:j + 1], y[i:j + 1]]))
+
+    def chord(i, j):
         return shapely.LineString([(x[i], y[i]), (x[j], y[j])])
 
-    orig = [barrier.intersects(seg(i, i + 1)) for i in range(n - 1)]
+    orig = [any(p.intersects(line(i, i + 1)) for p in parts) for i in range(n - 1)]
+
+    def consistent(a, k):
+        c = chord(a, k)
+        if any(p.intersects(c) for p in parts) and not any(orig[a:k]):
+            return False
+        sub = line(a, k)
+        points = np.column_stack([x[a:k + 1], y[a:k + 1]])
+        hull = shapely.MultiPoint(points).convex_hull
+        for p in parts:
+            if not p.intersects(hull):
+                continue
+            box = p.intersection(hull).bounds
+            if _reference_cells(sub, box) != _reference_cells(c, box):
+                return False
+        return True
+
     kept = np.flatnonzero(dp)
     for s, e in zip(kept[:-1], kept[1:]):
         a = s
         for j in range(s + 1, e):
-            if barrier.intersects(seg(a, j + 1)) and not any(orig[a:j + 1]):
+            if not consistent(a, j + 1):
                 keep[j] = True
                 a = j
     return keep
@@ -97,7 +149,40 @@ def test_detour_around_a_wall_is_kept():
 def test_touching_a_barrier_counts_as_crossing():
     x, y = [0, 5, 10], [0, 1, 0]
     assert _idx(_mask(x, y, 10, shapely.Point(5, 0))) == [0, 1, 2]
-    assert _idx(_mask(x, y, 10, shapely.Point(5, 0.5))) == [0, 2]
+    # Below the chord, outside the path's hull: not a neighbour.
+    assert _idx(_mask(x, y, 10, shapely.Point(5, -0.5))) == [0, 2]
+
+
+def test_an_island_may_not_change_sides():
+    # The vessel passes north of the island; the chord would pass south of it
+    # without touching it.  The nine cells differ, so the point is kept (D5).
+    x, y = [0, 500, 1000], [0, 300, 0]
+    island = shapely.box(450, 100, 550, 150)
+    sel = cpls_select(x, y, 5_000, island)
+    assert _idx(sel.dp) == [0, 2]
+    assert not segment_crossings(x, y, island, keep=sel.dp).any()
+    assert _idx(sel.mask) == [0, 1, 2]
+    # The same island south of the chord is outside the hull and changes nothing.
+    assert _idx(_mask(x, y, 5_000, shapely.box(450, -150, 550, -100))) == [0, 2]
+    # A point between path and chord is an island too.
+    assert _idx(_mask([0, 5, 10], [0, 1, 0], 10, shapely.Point(5, 0.5))) == [0, 1, 2]
+
+
+def test_direction_cells_are_the_nine_cell_model():
+    box = (0.0, 0.0, 1.0, 1.0)
+    bits = {}  # (column, row) -> bit, column west to east, row south to north
+    for i in range(3):
+        for j in range(3):
+            bits[i, j] = 1 << (3 * i + j)
+    below = _direction_cells(np.array([-1.0, 2.0]), np.array([-1.0, -1.0]), box)
+    assert below == bits[0, 0] | bits[1, 0] | bits[2, 0]
+    across = _direction_cells(np.array([0.5, 0.5]), np.array([-1.0, 2.0]), box)
+    assert across == bits[1, 0] | bits[1, 1] | bits[1, 2]
+    # Along an edge, through a corner, or standing still: no interior passed.
+    assert _direction_cells(np.array([-1.0, 2.0]), np.array([0.0, 0.0]), box) == 0
+    assert _direction_cells(np.array([5.0, 5.0]), np.array([5.0, 5.0]), box) == 0
+    diagonal = _direction_cells(np.array([-1.0, 2.0]), np.array([-1.0, 2.0]), box)
+    assert diagonal == bits[0, 0] | bits[1, 1] | bits[2, 2]
 
 
 def test_an_existing_crossing_is_tolerated():
@@ -120,7 +205,7 @@ def test_cpls_matches_the_literal_algorithm(seed, epsilon):
     x, y = _walk(seed=seed)
     parts = _barriers_for(x, y, seed)
     got = _mask(x, y, epsilon, parts)
-    assert np.array_equal(got, _reference_cpls(x, y, epsilon, shapely.union_all(parts)))
+    assert np.array_equal(got, _reference_cpls(x, y, epsilon, parts))
 
 
 def test_cpls_matches_the_literal_algorithm_when_the_last_segment_is_affected():
@@ -133,7 +218,7 @@ def test_cpls_matches_the_literal_algorithm_when_the_last_segment_is_affected():
     sel = cpls_select(x, y, 500, wall)
     assert _idx(sel.dp) == [0, 1, 13]
     assert _idx(sel.mask) == [0, 1, 8, 13]
-    assert np.array_equal(sel.mask, _reference_cpls(x, y, 500, wall))
+    assert np.array_equal(sel.mask, _reference_cpls(x, y, 500, [wall]))
 
 
 def test_cpls_matches_the_literal_algorithm_with_many_retained_points():
@@ -145,7 +230,7 @@ def test_cpls_matches_the_literal_algorithm_with_many_retained_points():
         parts = [g for g in _barriers_for(x, y, seed, count=1500)
                  if not shapely.intersects(g, path)]
         sel = cpls_select(x, y, 5_000.0, parts)
-        ref = _reference_cpls(x, y, 5_000.0, shapely.union_all(parts))
+        ref = _reference_cpls(x, y, 5_000.0, parts)
         assert np.array_equal(sel.mask, ref)
         assert sel.topology.sum() > 20
 

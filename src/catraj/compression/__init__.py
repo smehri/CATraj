@@ -13,9 +13,10 @@ by :mod:`catraj.annotation`, or recorded with the positions, like speed.
 
 :mod:`.cpls` implements Context-aware Piecewise Linear Segmentation of
 [Mehri2021]: Douglas--Peucker first, then a pass inside each of its segments
-that keeps any point whose removal would make the simplified trajectory cross
-a barrier -- a shoreline -- that the original did not cross.  The barriers are
-shapely geometries, indexed once by :class:`.Barriers`.
+that keeps any point whose removal would change the topological signature
+against a barrier -- a shoreline: a crossing the original did not have, or a
+barrier moved to the other side.  The barriers are shapely geometries, indexed
+once by :class:`.Barriers`.
 
 :mod:`.evaluation` scores a compression by its ratio and by DTW similarity.
 

@@ -56,14 +56,34 @@ Decisions, and the text behind them
   segment is void."  Line 1 builds the original's topological relations to
   compare against.  A new segment may therefore intersect a barrier only if
   the original sub-path it replaces already does.
-* **D5. Intersection is the whole test; sidedness is not checked.**  The text
-  above defines the comparison as an intersection check.  If the original
-  passes north of a small island and the new segment passes south of it
-  without touching it, the signature is unchanged in that sense, and CPLS
-  accepts it.  The paper's remark that consistency "may be violated if these
-  geometries are found within the convex hull of the set of vertices forming
-  the trajectory" says where conflicts can arise; here it is used only to
-  skip segments whose bounding box (which contains the hull) meets no barrier.
+* **D5. The signature includes the side: Tienaah's direction relation.**  The
+  paper takes the topological signature from Tienaah et al. [63] ("should be
+  the same [63]"; "with the idea of Tienaah [63]"), whose model has two parts:
+  the topological relation above, and a *direction relation* -- "the
+  simplified geometry must conform to the same quadrant relation as the
+  original to avoid side (left, right, up, down, diagonal, and interior)
+  conflicts" (Tienaah 2018, section 2.3.2, the chapter published as [63]).
+  So a chord is consistent only if, for every barrier that is a *neighbour*
+  of the sub-path it replaces, it passes through the same cells of the
+  nine-cell model as that sub-path:
+
+  - A neighbour is a barrier part that intersects the convex hull of the
+    sub-path's vertices: consistency "may be violated if these geometries are
+    found within the convex hull of the set of vertices forming the
+    trajectory" (the paper, after [63] and [65]).  Each part of a multi-part
+    barrier is a neighbour of its own.
+  - The nine cells are the neighbour's minimum bounding box *within the
+    hull* (``part & hull``), and the eight regions around it: N, NE, E, SE,
+    S, SW, W, NW.
+  - A line passes through a cell when it runs through the cell's interior for
+    a positive length.  Running exactly along a cell boundary, or a stretch
+    shorter than 1e-9 of a segment (rounding), does not count.
+
+  A vessel that passed north of an island and a chord that passes south of it
+  register different cells, so the point is kept even though the chord
+  touches nothing.  The rule is strict: a chord that cuts a bend can miss a
+  cell the bend went through without changing sides, and that keeps a point
+  too.  That is the model as published.
 * **D6. The offset distance is tested once, by Douglas--Peucker.**  Lines
   13-20 test only the topological signature.  A point added back is not
   followed by a new offset test, so a dropped point is within ``epsilon`` of
@@ -88,6 +108,9 @@ What the result guarantees
   touched them: compression never introduces a crossing
   (:func:`segment_crossings` with ``new_only=True`` measures it).
 * If the original never intersects a barrier, neither does the result.
+* For every pair of consecutive retained points, each barrier neighbouring the
+  original sub-path between them is passed through the same nine cells by the
+  segment as by the sub-path: no barrier changes side.
 * The first and last points are retained.
 
 Implementation
@@ -97,11 +120,23 @@ The barriers are indexed once (:class:`Barriers`).  Every chord between two
 points of a Douglas--Peucker segment lies inside the bounding box of that
 segment's points; if that box meets no barrier, stage 2 would drop everything
 there, so only the segments whose box does meet one are searched.  Inside
-those, the greedy tests a block of chords from the last retained point in one
-vectorised call -- the first failing chord is the same one the point-by-point
-loop would find -- and doubles the block while nothing fails.
+those the greedy goes point by point.  A chord whose hull meets no barrier is
+accepted at once; otherwise the neighbours are clipped to the hull and the
+nine-cell signatures are computed for all segments of the sub-path at once,
+from where each segment enters and leaves each band of the grid.
 
 Coordinates must be projected -- ``epsilon`` is a distance in their units.
+
+References
+----------
+[Mehri2021] Mehri, S., Alesheikh, A. A., Basiri, A. (2021).  A Contextual
+    Hybrid Model for Vessel Movement Prediction.  IEEE Access 9, 45600-45613.
+[63] Tienaah, T., Stefanakis, E., Coleman, D. (2015).  Contextual
+    Douglas-Peucker simplification.  Geomatica 69(3), 327-338.  Also chapter 2
+    of Tienaah, T. (2018), Line Simplification Under Spatial Constraints, UNB
+    Technical Report 314.
+[65] Saalfeld, A. (1999).  Topologically consistent line simplification with
+    the Douglas-Peucker algorithm.  Cartography and GIS 26(1), 7-18.
 """
 
 from __future__ import annotations
@@ -122,7 +157,10 @@ __all__ = [
     "cpls_compress",
 ]
 
-_FIRST_BLOCK = 64
+# A line "passes through" a cell of the direction model only for longer than
+# this fraction of a segment; shorter overlaps are rounding at a cell edge.
+_ROUNDING = 1e-9
+_CELL_BITS = 1 << np.arange(9)
 
 
 class Barriers:
@@ -298,32 +336,120 @@ class CplsSelection:
         ])
 
 
+def _band_intervals(a0, a1, lo, hi):
+    """Where along each segment the coordinate is below, inside and above a band.
+
+    For segments from ``a0`` to ``a1`` and the band edges ``lo <= hi``, the
+    parameter interval ``[t_start, t_end]`` (``t`` from 0 to 1 along the
+    segment) spent strictly below ``lo``, strictly between the edges, and
+    strictly above ``hi``.  Shape ``(m, 3, 2)``; an empty interval has
+    ``t_end <= t_start``.
+    """
+    d = a1 - a0
+    moving = d != 0
+    step = np.where(moving, d, 1.0)
+    t_lo = (lo - a0) / step
+    t_hi = (hi - a0) / step
+    up = d > 0
+    out = np.empty(a0.shape + (3, 2))
+    out[:, 0, 0] = np.where(up, 0.0, t_lo)
+    out[:, 0, 1] = np.where(up, t_lo, 1.0)
+    out[:, 1, 0] = np.where(up, t_lo, t_hi)
+    out[:, 1, 1] = np.where(up, t_hi, t_lo)
+    out[:, 2, 0] = np.where(up, t_hi, 0.0)
+    out[:, 2, 1] = np.where(up, 1.0, t_hi)
+    # A coordinate that does not change stays in one band, or on an edge.
+    still = ~moving
+    inside = (a0 < lo, (a0 > lo) & (a0 < hi), a0 > hi)
+    for band, here in enumerate(inside):
+        out[still, band, 0] = 0.0
+        out[still, band, 1] = here[still].astype(float)
+    return np.clip(out, 0.0, 1.0)
+
+
+def _direction_cells(x, y, box):
+    """Tienaah's nine-cell direction signature of a polyline around ``box``.
+
+    Bit ``3 * i + j`` is set when the line runs through the interior of the
+    cell in column ``i`` (west of, across, east of the box) and row ``j``
+    (south of, across, north of the box) for more than a rounding fraction of
+    some segment.  Zero-length segments (repeated positions) pass through
+    nothing.
+    """
+    xmin, ymin, xmax, ymax = box
+    moving = (x[1:] != x[:-1]) | (y[1:] != y[:-1])
+    x0, x1, y0, y1 = x[:-1][moving], x[1:][moving], y[:-1][moving], y[1:][moving]
+    tx = _band_intervals(x0, x1, xmin, xmax)
+    ty = _band_intervals(y0, y1, ymin, ymax)
+    start = np.maximum(tx[:, :, None, 0], ty[:, None, :, 0])
+    end = np.minimum(tx[:, :, None, 1], ty[:, None, :, 1])
+    visited = ((end - start) > _ROUNDING).any(axis=0)
+    return int(visited.ravel() @ _CELL_BITS)
+
+
+def _consistent(x, y, barriers, cs, a, k, hull, near):
+    """Whether the chord ``a -> k`` keeps the signature of the sub-path ``a..k``.
+
+    ``hull`` is the convex hull of the sub-path's vertices and ``near`` the
+    barrier parts that intersect it, the neighbours; there is at least one.
+    D3/D4: the chord creates no intersection the sub-path did not have.  D5:
+    every neighbour is passed through the same nine cells by the chord as by
+    the sub-path.
+    """
+    parts = barriers._parts[near]
+    chord = shapely.linestrings([[x[a], y[a]], [x[k], y[k]]])
+    if cs[k] == cs[a] and shapely.intersects(parts, chord).any():
+        return False
+    xmin, ymin, xmax, ymax = shapely.bounds(hull)
+    if xmax > xmin and ymax > ymin:  # clipping first spares GEOS large polygons
+        parts = shapely.clip_by_rect(parts, xmin, ymin, xmax, ymax)
+    neighbours = shapely.intersection(parts, hull)
+    sub_x, sub_y = x[a:k + 1], y[a:k + 1]
+    chord_x, chord_y = x[[a, k]], y[[a, k]]
+    for box in shapely.bounds(neighbours):
+        if np.isnan(box).any():
+            continue
+        if _direction_cells(sub_x, sub_y, box) != _direction_cells(
+            chord_x, chord_y, box
+        ):
+            return False
+    return True
+
+
 def _greedy(x, y, barriers, cs, start, end, keep):
     """Stage 2 inside one Douglas--Peucker segment ``start``--``end``.
 
-    From the last retained point ``a``, the chord ``a -> k`` replaces the path
-    through points ``a+1 .. k-1``; the first ``k`` whose chord is not
-    consistent means point ``k - 1`` must be retained.
+    Lines 14-20, point by point: with ``a`` the last retained point, removing
+    point ``k - 1`` replaces the sub-path ``a..k`` by the chord ``a -> k``; if
+    that breaks the signature, point ``k - 1`` is retained.  A chord whose
+    sub-path has no neighbour is consistent at once: it lies inside the hull,
+    so it meets nothing.  The bounding box, and the hull once needed, grow with
+    ``k`` instead of being rebuilt from the whole sub-path.
     """
-    a = start
-    lo, size = a + 2, _FIRST_BLOCK
-    while lo <= end:
-        hi = min(lo + size - 1, end)
-        ks = np.arange(lo, hi + 1)
-        bad = np.zeros(ks.size, dtype=bool)
-        open_ = (cs[ks] - cs[a]) == 0  # chords over an untouched original
-        if open_.any():
-            probe = ks[open_]
-            bad[open_] = barriers.hits(
-                np.full(probe.size, x[a]), np.full(probe.size, y[a]),
-                x[probe], y[probe],
-            )
-        if bad.any():
-            a = int(ks[np.argmax(bad)]) - 1
-            keep[a] = True
-            lo, size = a + 2, _FIRST_BLOCK
+    a, k = start, start + 2
+    box = hull_xy = None
+    while k <= end:
+        if box is None:  # a new sub-path from a
+            box = [x[a:k + 1].min(), y[a:k + 1].min(),
+                   x[a:k + 1].max(), y[a:k + 1].max()]
+            hull_xy, hull_upto = np.column_stack([x[a:a + 1], y[a:a + 1]]), a
         else:
-            lo, size = hi + 1, size * 2
+            box = [min(box[0], x[k]), min(box[1], y[k]),
+                   max(box[2], x[k]), max(box[3], y[k])]
+        near = barriers._tree.query(shapely.box(*box))
+        hull = None
+        if near.size:
+            new = np.column_stack([x[hull_upto + 1:k + 1], y[hull_upto + 1:k + 1]])
+            hull = shapely.convex_hull(shapely.multipoints(np.vstack([hull_xy, new])))
+            hull_xy, hull_upto = shapely.get_coordinates(hull), k
+            near = near[shapely.intersects(barriers._parts[near], hull)]
+        if near.size == 0 or _consistent(x, y, barriers, cs, a, k, hull, near):
+            k += 1
+        else:
+            a = k - 1
+            keep[a] = True
+            k = a + 2
+            box = None
 
 
 def cpls_select(x, y, epsilon, barriers):
