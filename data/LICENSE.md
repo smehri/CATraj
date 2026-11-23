@@ -11,7 +11,7 @@ full field descriptions and provenance.
 The full archive you download into `zenodo_1167595/` comes from the same
 source under the same terms, plus the sea state data. Its licences are listed
 in section 7 of
-[`05_tutorials/00_getting_the_data.md`](../05_tutorials/00_getting_the_data.md).
+[`docs/getting_the_data.md`](../docs/getting_the_data.md).
 
 ---
 
@@ -31,7 +31,7 @@ Vessel positions from the Automatic Identification System.
 
 - **BY** — attribute the Naval Academy, France.
 - **NC** — **no commercial use.** This is stricter than the code licence: the
-  BSD grant on `02_src/` does not extend here.
+  BSD grant on `src/` does not extend here.
 - **SA** — anything derived from this data must be shared under the same
   licence. Annotated trajectories derived from it are derivative works.
 

@@ -6,7 +6,7 @@ REM ============================================================
 
 title catraj - trajectory annotation
 
-REM Run from the repository root (this file lives in 04_app\), wherever it
+REM Run from the repository root (this file lives in app\), wherever it
 REM was launched from.
 cd /d "%~dp0.."
 
@@ -28,7 +28,7 @@ if not exist "%PYTHON%" (
     echo.
     echo   Edit this file and set PYTHON to your own interpreter, or run:
     echo     conda activate catraj
-    echo     python 04_app\run_app.py
+    echo     python app\run_app.py
     echo.
     pause
     exit /b 1
@@ -41,7 +41,7 @@ echo.
 echo   Close this window to stop the app.
 echo.
 
-"%PYTHON%" "04_app\run_app.py" %*
+"%PYTHON%" "app\run_app.py" %*
 
 REM Keep the window open if it exited unexpectedly, so the error stays readable.
 if errorlevel 1 pause

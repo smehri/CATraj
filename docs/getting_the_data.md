@@ -6,11 +6,11 @@ use. Read it before you run anything beyond the 24-hour sample.
 **In short.** Run this from the repository root:
 
 ```bash
-python 05_tutorials/download_data.py
+python scripts/download_data.py
 ```
 
 It downloads about 773 MB from Zenodo, checks each file against its published
-checksum, and extracts what the code reads into `08_data/zenodo_1167595/`.
+checksum, and extracts what the code reads into `data/zenodo_1167595/`.
 Running it again is safe: an interrupted download resumes, and files already
 in place are skipped.
 
@@ -20,13 +20,13 @@ in place are skipped.
 
 | you want to run | data it needs | download |
 |---|---|---|
-| `05_tutorials/01_trajectory_annotation.ipynb` with the 24-hour sample (`SOURCE = "sample"`) | `08_data/sample/`, **already in the repository** | none |
-| `04_app/` (the annotation app) | `08_data/sample/`, already in the repository | none |
-| `07_benchmarks/equal_size_sample_data.py` | `08_data/sample/`, already in the repository | none |
-| `05_tutorials/01_trajectory_annotation.ipynb` with the full archive (`SOURCE = "zenodo"`) | AIS data, AIS codes, weather | `download_data.py annotation` (~203 MB) |
-| `05_tutorials/02_cadp_compression.ipynb` | AIS data, ocean conditions | `download_data.py cadp` (~771 MB) |
-| `07_benchmarks/prepare_feb2016.py`, `paper_experiments.py` | AIS data, ocean conditions | `download_data.py cadp` |
-| `06_workflows/01_cadp_on_annotated_fleet.py` | the annotated fleet that tutorial 1 writes (section 5 below) | `download_data.py annotation` |
+| `notebooks/01_trajectory_annotation.ipynb` with the 24-hour sample (`SOURCE = "sample"`) | `data/sample/`, **already in the repository** | none |
+| `app/` (the annotation app) | `data/sample/`, already in the repository | none |
+| `scripts/benchmarks/equal_size_sample_data.py` | `data/sample/`, already in the repository | none |
+| `notebooks/01_trajectory_annotation.ipynb` with the full archive (`SOURCE = "zenodo"`) | AIS data, AIS codes, weather | `download_data.py annotation` (~203 MB) |
+| `notebooks/02_cadp_compression.ipynb` | AIS data, ocean conditions | `download_data.py cadp` (~771 MB) |
+| `scripts/benchmarks/prepare_feb2016.py`, `paper_experiments.py` | AIS data, ocean conditions | `download_data.py cadp` |
+| `scripts/cadp_on_annotated_fleet.py` | the annotated fleet that tutorial 1 writes (section 5 below) | `download_data.py annotation` |
 
 With `SOURCE = "auto"`, the default, tutorial 1 uses the full archive if it has
 been downloaded and the sample otherwise. So it runs either way.
@@ -64,8 +64,8 @@ The ocean archive holds one file per month, `oc_october.csv` to
 
 The archives are kept by default (about 770 MB more), so nothing is downloaded
 twice. Pass `--remove-zips` to delete each one after it is extracted. Running
-the code adds more output: about 400 MB for `08_data/cache/cadp_feb2016.pkl` from the
-benchmarks, and up to about 2 GB in `10_results/`.
+the code adds more output: about 400 MB for `data/cache/cadp_feb2016.pkl` from the
+benchmarks, and up to about 2 GB in `results/`.
 
 ---
 
@@ -77,10 +77,10 @@ All three put the files in the same place (section 4). Pick one.
 
 ```bash
 conda activate catraj                               # any Python 3.10+ works; only the standard library is used
-python 05_tutorials/download_data.py                # everything
-python 05_tutorials/download_data.py annotation     # tutorial 1 only
-python 05_tutorials/download_data.py cadp           # tutorial 2 and the benchmarks
-python 05_tutorials/download_data.py --check        # report what is present, download nothing
+python scripts/download_data.py                # everything
+python scripts/download_data.py annotation     # tutorial 1 only
+python scripts/download_data.py cadp           # tutorial 2 and the benchmarks
+python scripts/download_data.py --check        # report what is present, download nothing
 ```
 
 | option | effect |
@@ -90,7 +90,7 @@ python 05_tutorials/download_data.py --check        # report what is present, do
 | `--check` | list what is present; exits with 1 if anything is missing |
 
 It works from any folder, because paths are resolved from the script's own
-location. `python 05_tutorials/download_data.py --help` lists the options.
+location. `python scripts/download_data.py --help` lists the options.
 
 ### B · From inside a notebook
 
@@ -112,7 +112,7 @@ or if you want a download manager.
    ```bash
    # Linux, macOS, or Windows 10+ (in PowerShell type curl.exe, not curl).
    # -C - resumes an interrupted download; the URLs are percent-encoded on purpose.
-   cd 08_data
+   cd data
    mkdir zenodo_1167595
    cd zenodo_1167595
    curl -L -C - -o P1_AIS_Data.zip                    "https://zenodo.org/records/1167595/files/%5BP1%5D%20AIS%20Data.zip?download=1"
@@ -151,18 +151,18 @@ or if you want a download manager.
    ```
 
 4. **Check** that it is all in place:
-   `python 05_tutorials/download_data.py --check`.
+   `python scripts/download_data.py --check`.
 
 ---
 
 ## 4 · Where the files go
 
 Paths are relative to the repository root. The code looks only here, and git
-ignores everything in `08_data/` except its README, its LICENSE and the
+ignores everything in `data/` except its README, its LICENSE and the
 committed 24-hour sample in `sample/`.
 
 ```
-08_data/
+data/
 ├── sample/                           the 24-hour sample, committed (not used here)
 ├── cache/                            files the benchmarks build, e.g. cadp_feb2016.pkl
 └── zenodo_1167595/
@@ -187,17 +187,17 @@ committed 24-hour sample in `sample/`.
 
 | step | command | reads | writes |
 |---|---|---|---|
-| 1 | open `05_tutorials/01_trajectory_annotation.ipynb`, keep `SOURCE = "auto"` (or `"zenodo"`), run all | the AIS data, AIS codes, weather | `10_results/01_trajectory_annotation/`, including `06_fleet_annotated.parquet` (~1 GB) when `EXPORT_FLEET = True` |
-| 2 | `python 06_workflows/01_cadp_on_annotated_fleet.py` | `06_fleet_annotated.parquet` from step 1 | `10_results/02_cadp_compression/` |
-| 3 | open `05_tutorials/02_cadp_compression.ipynb`, run all | `nari_dynamic.csv`, `oc_february.csv` | figures and tables inline |
-| 4 | `python 07_benchmarks/prepare_feb2016.py`, then `python 07_benchmarks/paper_experiments.py` | the same two files | `08_data/cache/cadp_feb2016.pkl`, then the paper's experiments |
+| 1 | open `notebooks/01_trajectory_annotation.ipynb`, keep `SOURCE = "auto"` (or `"zenodo"`), run all | the AIS data, AIS codes, weather | `results/01_trajectory_annotation/`, including `06_fleet_annotated.parquet` (~1 GB) when `EXPORT_FLEET = True` |
+| 2 | `python scripts/cadp_on_annotated_fleet.py` | `06_fleet_annotated.parquet` from step 1 | `results/02_cadp_compression/` |
+| 3 | open `notebooks/02_cadp_compression.ipynb`, run all | `nari_dynamic.csv`, `oc_february.csv` | figures and tables inline |
+| 4 | `python scripts/benchmarks/prepare_feb2016.py`, then `python scripts/benchmarks/paper_experiments.py` | the same two files | `data/cache/cadp_feb2016.pkl`, then the paper's experiments |
 
 Step 2 depends on step 1. Steps 3 and 4 do not depend on either.
 
 Tutorial 1 reads the whole archive by default (`WINDOW` covers all six months,
 and `MAX_VESSELS = None` takes every vessel). Loading `nari_dynamic.csv` in
 full needs several GB of memory. On a smaller machine, narrow `WINDOW` to a
-few days or set `MAX_VESSELS`. Workflow 2 then processes whatever tutorial 1
+few days or set `MAX_VESSELS`. Step 2 then processes whatever tutorial 1
 exported.
 
 ---
@@ -210,8 +210,8 @@ exported.
 | `checksum mismatch` | the archive was deleted; run again to download it afresh. If it happens again, download it by hand (3 C) |
 | very slow, or blocked by a firewall | the script honours the `HTTPS_PROXY` environment variable; otherwise download by hand with a browser or a download manager (3 C) |
 | Zenodo returns an error, e.g. 429 *Too Many Requests* or 5xx | wait a few minutes and run the script again |
-| a notebook raises `FileNotFoundError: missing: 08_data/...` | the file is not where section 4 says; run `python 05_tutorials/download_data.py --check` |
-| `06_workflows/01_...` says the Parquet file is missing | run tutorial 1 with the full archive and `EXPORT_FLEET = True` first (section 5) |
+| a notebook raises `FileNotFoundError: missing: data/...` | the file is not where section 4 says; run `python scripts/download_data.py --check` |
+| `scripts/cadp_on_annotated_fleet.py` says the Parquet file is missing | run tutorial 1 with the full archive and `EXPORT_FLEET = True` first (section 5) |
 | out of disk space | extract only what you need (`annotation` or `cadp`), add `--remove-zips`, and keep `--months feb` |
 
 ---
@@ -234,5 +234,5 @@ terms.
 * **Weather** ([E2], rp5.ua, from Met Office / NOAA data): public; cite the source.
 
 If you publish work that uses this data, cite Ray et al. (2019) above as well.
-The 24-hour sample in `08_data/sample/` is cut from the same archive, under the
-same terms ([`08_data/LICENSE.md`](../08_data/LICENSE.md)).
+The 24-hour sample in `data/sample/` is cut from the same archive, under the
+same terms ([`data/LICENSE.md`](../data/LICENSE.md)).

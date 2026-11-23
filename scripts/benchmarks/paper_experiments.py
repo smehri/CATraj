@@ -1,4 +1,4 @@
-"""TEMPORARY research script -- see 07_benchmarks/README.md; not part of catraj.
+"""TEMPORARY research script -- see scripts/benchmarks/README.md; not part of catraj.
 
 Re-run the CADP paper's experiments (Mehri et al. 2025, sections 3.2 and 3.4)
 on the February 2016 AIS + WAVEWATCH III data, with both CADP modes.
@@ -11,7 +11,7 @@ Settings as written in the paper:
 Trajectories: one per vessel (MovingPandas TrajectoryCollection by MMSI).
 DTW: on a fixed sample of 100 vessels (100-5000 points), same for every method.
 
-usage: python 07_benchmarks/paper_experiments.py   (from the repository root)
+usage: python scripts/benchmarks/paper_experiments.py   (from the repository root)
 """
 import os
 import sys
@@ -22,12 +22,11 @@ os.environ.setdefault("MKL_THREADING_LAYER", "SEQUENTIAL")
 import numpy as np
 import pandas as pd
 
-ROOT = sys.argv[1] if len(sys.argv) > 1 else str(Path(__file__).resolve().parents[1])
-sys.path.insert(0, f"{ROOT}/src")
+ROOT = sys.argv[1] if len(sys.argv) > 1 else str(Path(__file__).resolve().parents[2])
 from catraj.compression import Context, cadp_select, context_errors, douglas_peucker, dtw
 from catraj.compression.cadp import _refine
 
-a = pd.read_pickle(f"{ROOT}/08_data/cache/cadp_feb2016.pkl")
+a = pd.read_pickle(f"{ROOT}/data/cache/cadp_feb2016.pkl")
 N = len(a)
 mm = a.mmsi.to_numpy()
 B = np.r_[np.flatnonzero(np.r_[True, mm[1:] != mm[:-1]]), N]

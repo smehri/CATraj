@@ -1,4 +1,4 @@
-"""TEMPORARY research script -- see 07_benchmarks/README.md; not part of catraj.
+"""TEMPORARY research script -- see scripts/benchmarks/README.md; not part of catraj.
 
 Build the CADP paper's dataset: February 2016 AIS annotated with sea state.
 
@@ -10,7 +10,7 @@ Ocean: [E1] oc_february.csv (WAVEWATCH III, SHOM-IFREMER), 3-hourly, 43,206
        vectorised, because the grid is fixed: neighbours and weights are found
        once per AIS position, not refitted per epoch.
 
-usage: python 07_benchmarks/prepare_feb2016.py   (from the repository root)
+usage: python scripts/benchmarks/prepare_feb2016.py   (from the repository root)
 """
 import os
 import sys
@@ -23,9 +23,9 @@ import pandas as pd
 from pyproj import Transformer
 from scipy.spatial import cKDTree
 
-ROOT = sys.argv[1] if len(sys.argv) > 1 else str(Path(__file__).resolve().parents[1])
-SRC = f"{ROOT}/08_data/zenodo_1167595"
-OUT = f"{ROOT}/08_data/cache/cadp_feb2016.pkl"
+ROOT = sys.argv[1] if len(sys.argv) > 1 else str(Path(__file__).resolve().parents[2])
+SRC = f"{ROOT}/data/zenodo_1167595"
+OUT = f"{ROOT}/data/cache/cadp_feb2016.pkl"
 LO, HI = pd.Timestamp("2016-02-01").value // 10**9, pd.Timestamp("2016-03-01").value // 10**9
 to_utm = Transformer.from_crs(4326, 32630, always_xy=True)
 t0 = time.time()
@@ -111,7 +111,6 @@ for var, circ in (("dpt", False), ("hs", False), ("dir", True), ("wlv", False)):
           f"range {np.nanmin(a[var]):.2f} .. {np.nanmax(a[var]):.2f}  ({time.time() - t0:.0f}s)")
 
 # ------------------------------ cross-check against catraj.annotation itself
-sys.path.insert(0, f"{ROOT}/src")
 from catraj.annotation import DLT, IDW, angular_residual, annotate_points
 
 rng = np.random.default_rng(0)

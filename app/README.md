@@ -12,7 +12,7 @@ method is not.
 
 ```bash
 conda activate catraj
-python 04_app/run_app.py
+python app/run_app.py
 ```
 
 That opens <http://localhost:5006/annotation_app> in your browser.
@@ -20,15 +20,15 @@ That opens <http://localhost:5006/annotation_app> in your browser.
 Options:
 
 ```bash
-python 04_app/run_app.py --port 5010      # a different port
-python 04_app/run_app.py --no-show        # do not open a browser
-python 04_app/run_app.py --address 0.0.0.0  # reachable from other machines
+python app/run_app.py --port 5010      # a different port
+python app/run_app.py --no-show        # do not open a browser
+python app/run_app.py --address 0.0.0.0  # reachable from other machines
 ```
 
 Or serve it directly, which is the same thing:
 
 ```bash
-panel serve 04_app/annotation_app.py --show
+panel serve app/annotation_app.py --show
 ```
 
 > On Windows, set `MKL_THREADING_LAYER=SEQUENTIAL` first if you serve it
@@ -89,7 +89,7 @@ Two choices belong to whoever knows the data:
 
 Writes to whatever folder you name — a GeoPackage with geometry, a CSV without,
 and the cross-validation score tables behind the choice. The default is
-`10_results/03_app_exports/`; a relative path is taken from the repository root,
+`results/03_app_exports/`; a relative path is taken from the repository root,
 and the folder is created if it does not exist.
 
 Annotated columns are renamed if they would collide with an existing column,

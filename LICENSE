@@ -3,9 +3,9 @@ BSD 3-Clause License
 Copyright (c) 2026, Saeed Mehri
 All rights reserved.
 
-This licence covers the source code. The sample data under 08_data/sample/ comes from
+This licence covers the source code. The sample data under data/sample/ comes from
 third parties and carries its own, stricter terms -- the AIS extract is
-CC BY-NC-SA 4.0, which forbids commercial use. See 08_data/LICENSE.md.
+CC BY-NC-SA 4.0, which forbids commercial use. See data/LICENSE.md.
 
 Redistribution and use in source and binary forms, with or without
 modification, are permitted provided that the following conditions are met:

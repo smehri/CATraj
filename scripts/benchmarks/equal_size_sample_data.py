@@ -1,4 +1,4 @@
-"""TEMPORARY research script -- see 07_benchmarks/README.md; not part of catraj.
+"""TEMPORARY research script -- see scripts/benchmarks/README.md; not part of catraj.
 
 Equal-budget comparison over every usable context variable.
 
@@ -19,7 +19,7 @@ import geopandas as gpd
 import numpy as np
 import pandas as pd
 
-ROOT = sys.argv[1] if len(sys.argv) > 1 else str(Path(__file__).resolve().parents[1])
+ROOT = sys.argv[1] if len(sys.argv) > 1 else str(Path(__file__).resolve().parents[2])
 from catraj.annotation import IDW, Spline, annotate_points, decode_compass
 from catraj.compression import Context, cadp_select, context_errors, douglas_peucker, dtw
 
@@ -30,9 +30,9 @@ AIS_NAMES = {"sourcemmsi": "mmsi", "t": "unix_time", "navigation": "navigational
 WEATHER_NAMES = {"id_station": "station_id", "local_time": "unix_time", "T": "air_temperature",
                  "P": "air_pressure", "U": "relative_humidity", "Td": "dew_point",
                  "VV": "visibility", "Ff": "wind_speed", "id_windDir": "wind_direction_code"}
-ais = (gpd.read_file(f"{ROOT}/08_data/sample/AIS/AIS_DLT_UTM.shp").rename(columns=AIS_NAMES)
+ais = (gpd.read_file(f"{ROOT}/data/sample/AIS/AIS_DLT_UTM.shp").rename(columns=AIS_NAMES)
           .sort_values(["mmsi", "unix_time"]))
-w = gpd.read_file(f"{ROOT}/08_data/sample/Weather/Weather_Observation_UTM.shp").rename(
+w = gpd.read_file(f"{ROOT}/data/sample/Weather/Weather_Observation_UTM.shp").rename(
     columns=WEATHER_NAMES)
 
 # AIS "not available" codes -> NaN

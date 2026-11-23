@@ -7,17 +7,17 @@ Everything comes from one Zenodo record:
     and Reconnaissance. Data in Brief 25, 104141. doi:10.1016/j.dib.2019.104141
     Data: doi:10.5281/zenodo.1167595 -- https://zenodo.org/records/1167595
 
-The files go to ``08_data/zenodo_1167595/``, which git ignores. Each archive is
+The files go to ``data/zenodo_1167595/``, which git ignores. Each archive is
 checked against the MD5 checksum published on the record, then only the files
 the code reads are extracted. An interrupted download resumes where it stopped,
 and anything already in place is skipped, so running the script again is safe.
 
 Usage, from the repository root, in the ``catraj`` environment::
 
-    python 05_tutorials/download_data.py                # everything (~773 MB download)
-    python 05_tutorials/download_data.py annotation     # tutorial 1 only (~203 MB)
-    python 05_tutorials/download_data.py cadp           # tutorial 2 and 07_benchmarks (~771 MB)
-    python 05_tutorials/download_data.py --check        # report what is present, download nothing
+    python scripts/download_data.py                # everything (~773 MB download)
+    python scripts/download_data.py annotation     # tutorial 1 only (~203 MB)
+    python scripts/download_data.py cadp           # tutorial 2 and the benchmarks (~771 MB)
+    python scripts/download_data.py --check        # report what is present, download nothing
 
 Options::
 
@@ -27,7 +27,7 @@ Options::
                         run, or DOWNLOAD = True in a notebook, downloads it again)
 
 Only the Python standard library is used, so the script runs before anything
-else is installed. The full guide is ``05_tutorials/00_getting_the_data.md``.
+else is installed. The full guide is ``docs/getting_the_data.md``.
 
 Licences: the AIS data is CC BY-NC-SA 4.0 (attribute NARI, Brest; no
 commercial use; derived data under the same licence). Sea state (SHOM-IFREMER,
@@ -49,7 +49,7 @@ import zipfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-DATA = ROOT / "08_data" / "zenodo_1167595"
+DATA = ROOT / "data" / "zenodo_1167595"
 RECORD = "https://zenodo.org/records/1167595/files/"
 
 MONTHS = {"oct": "october", "nov": "november", "dec": "december",
@@ -139,7 +139,7 @@ def download(name: str, target: Path, size: int, attempts: int = 5) -> None:
             time.sleep(min(30, 2 ** attempt))
     if not part.exists() or part.stat().st_size != size:
         raise SystemExit(f"could not download {name}; run the script again to resume, "
-                         f"or download it by hand (see 05_tutorials/00_getting_the_data.md)")
+                         f"or download it by hand (see docs/getting_the_data.md)")
     part.replace(target)
 
 
@@ -183,10 +183,10 @@ def report(names: list[str], months: list[str]) -> bool:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
-        description="Download the Zenodo data (doi:10.5281/zenodo.1167595) into 08_data/zenodo_1167595/.",
-        epilog="Full guide: 05_tutorials/00_getting_the_data.md")
+        description="Download the Zenodo data (doi:10.5281/zenodo.1167595) into data/zenodo_1167595/.",
+        epilog="Full guide: docs/getting_the_data.md")
     parser.add_argument("target", nargs="?", default="all", choices=sorted(TARGETS),
-                        help="annotation: tutorial 1; cadp: tutorial 2 and 07_benchmarks; "
+                        help="annotation: tutorial 1; cadp: tutorial 2 and the benchmarks; "
                              "all (default): both")
     parser.add_argument("--months", default="feb",
                         help="sea-state months to extract: comma-separated from "

@@ -51,10 +51,10 @@ desktop.ini
 # the papers, the decisions taken where they are ambiguous, and the reasoning
 # behind them. It is not part of the published package.
 # ---------------------------------------------------------------------------
-02_src/catraj/**/CLAUDE.md
+src/catraj/**/CLAUDE.md
 
 # ---------------------------------------------------------------------------
-# Papers (01_docs/papers/)
+# Papers (docs/papers/)
 #
 # The open-access source papers (CC BY) are committed, so the method each
 # module implements can be checked against its source.
@@ -63,27 +63,27 @@ desktop.ini
 # article and this repository is public. README.md links it by DOI. These
 # patterns keep it out even if a copy is dropped into the folder.
 # ---------------------------------------------------------------------------
-01_docs/papers/*Ocean-Engineering*
-01_docs/papers/*context-aware approach for vessels*
+docs/papers/*Ocean-Engineering*
+docs/papers/*context-aware approach for vessels*
 
 # ---------------------------------------------------------------------------
-# Data (08_data/) and generated output (10_results/)
+# Data (data/) and generated output (results/)
 #
 # Large, licence-restricted, and regenerated on every run. Only the README
 # that says what belongs in each folder is committed, plus the data licences
-# and the 24-hour sample in 08_data/sample/ (re-included at the end of this file).
+# and the 24-hour sample in data/sample/ (re-included at the end of this file).
 # ---------------------------------------------------------------------------
-08_data/*
-!08_data/README.md
-!08_data/LICENSE.md
-10_results/*
-!10_results/README.md
+data/*
+!data/README.md
+!data/LICENSE.md
+results/*
+!results/README.md
 
 # ---------------------------------------------------------------------------
 # Data files anywhere else
 #
 # Movement and context datasets are large and often licence-restricted, so they
-# are not committed. The sample archives in 08_data/sample/ are the exception: the
+# are not committed. The sample archives in data/sample/ are the exception: the
 # tutorials, tests and app point at them out of the box, so they are
 # force-included below. Point tests at small synthetic fixtures rather than
 # adding real data.
@@ -107,5 +107,5 @@ desktop.ini
 *.qix
 
 # The sample datasets the tutorials, tests and app depend on.
-!08_data/sample/
-!08_data/sample/**
+!data/sample/
+!data/sample/**

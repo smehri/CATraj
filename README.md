@@ -33,15 +33,15 @@ releases.
 
 ## Papers
 
-The two open-access papers are in [`01_docs/papers/`](01_docs/papers/), so each module can be
+The two open-access papers are in [`docs/papers/`](docs/papers/), so each module can be
 checked against the method it implements; the 2023 paper is available from its
 publisher via the DOI. The implementation does not depend on having them.
 
 | Year | Paper | | |
 |---|---|---|---|
-| 2025 | *A Novel Context-Aware Douglas–Peucker (CADP) Trajectory Compression Method.* ISPRS Int. J. Geo-Inf., 14(2), 58. | [pdf](01_docs/papers/2025_Mehri_IJGI_CADP.pdf) | [doi](https://doi.org/10.3390/ijgi14020058) |
+| 2025 | *A Novel Context-Aware Douglas–Peucker (CADP) Trajectory Compression Method.* ISPRS Int. J. Geo-Inf., 14(2), 58. | [pdf](docs/papers/2025_Mehri_IJGI_CADP.pdf) | [doi](https://doi.org/10.3390/ijgi14020058) |
 | 2023 | *A context-aware approach for vessels' trajectory prediction.* Ocean Engineering, 282, 114916. | — | [doi](https://doi.org/10.1016/j.oceaneng.2023.114916) |
-| 2021 | *A Contextual Hybrid Model for Vessel Movement Prediction.* IEEE Access, 9, 45600–45613. | [pdf](01_docs/papers/2021_Mehri_IEEE-Access_Contextual-Hybrid-Model_CPLS-CLSTM.pdf) | [doi](https://doi.org/10.1109/ACCESS.2021.3066463) |
+| 2021 | *A Contextual Hybrid Model for Vessel Movement Prediction.* IEEE Access, 9, 45600–45613. | [pdf](docs/papers/2021_Mehri_IEEE-Access_Contextual-Hybrid-Model_CPLS-CLSTM.pdf) | [doi](https://doi.org/10.1109/ACCESS.2021.3066463) |
 
 ---
 
@@ -49,15 +49,14 @@ publisher via the DOI. The implementation does not depend on having them.
 
 | folder | what it holds |
 |---|---|
-| [`01_docs/`](01_docs/) | the source papers (open-access ones) |
-| [`02_src/catraj/`](02_src/catraj/) | the library: `annotation`, `compression` |
-| [`03_tests/`](03_tests/) | the test suite (`pytest`) |
-| [`04_app/`](04_app/) | the interactive annotation app |
-| [`05_tutorials/`](05_tutorials/) | notebooks, in order, and the data guide and downloader (`00_getting_the_data.md`, `download_data.py`) |
-| [`06_workflows/`](06_workflows/) | scripts that run a method over the whole archive |
-| [`07_benchmarks/`](07_benchmarks/) | temporary research scripts, to be removed |
-| [`08_data/`](08_data/) | all data ([`README`](08_data/README.md)): the 24-hour sample in `sample/`, committed; the downloaded archive in `zenodo_1167595/` and built files in `cache/`, not committed (how to get them: [`00_getting_the_data.md`](05_tutorials/00_getting_the_data.md)) |
-| `10_results/` | everything the notebooks and workflows write, not committed ([`README`](10_results/README.md)) |
+| [`src/catraj/`](src/catraj/) | the library: `annotation`, `compression` |
+| [`tests/`](tests/) | the test suite (`pytest`) |
+| [`notebooks/`](notebooks/) | the tutorials, in reading order |
+| [`scripts/`](scripts/) | command-line scripts: the data downloader, whole-archive workflows, and `benchmarks/` (temporary research scripts, to be removed) |
+| [`app/`](app/) | the interactive annotation app |
+| [`data/`](data/) | all data: the 24-hour sample in `sample/`, committed; the downloaded archive in `zenodo_1167595/` and built files in `cache/`, not committed |
+| `results/` | everything the notebooks, scripts and app write, not committed ([`README`](results/README.md)) |
+| [`docs/`](docs/) | the source papers (open-access ones) and [`getting_the_data.md`](docs/getting_the_data.md) |
 
 ---
 
@@ -151,16 +150,16 @@ There is also an interactive app, which compares interpolation methods by
 cross-validation before annotating:
 
 ```bash
-python 04_app/run_app.py       # or double-click 04_app/"Run Annotation App.bat"
+python app/run_app.py       # or double-click app/"Run Annotation App.bat"
 ```
 
 | | |
 |---|---|
-| [`05_tutorials/00_getting_the_data.md`](05_tutorials/00_getting_the_data.md) | how to download the public archive the tutorials use: one command, by hand, checksums, troubleshooting |
-| [`05_tutorials/01_trajectory_annotation.ipynb`](05_tutorials/01_trajectory_annotation.ipynb) | annotation on real data, from the 24-hour sample up to the whole six-month archive, with interactive plots |
-| [`05_tutorials/02_cadp_compression.ipynb`](05_tutorials/02_cadp_compression.ipynb) | CADP on the paper's data (AIS + WAVEWATCH III sea state, Feb 2016): download links and licences, both modes, the paper's experiments |
-| [`04_app/README.md`](04_app/README.md) | the app |
-| [`06_workflows/README.md`](06_workflows/README.md) | scripts that process the whole archive end to end |
+| [`docs/getting_the_data.md`](docs/getting_the_data.md) | how to download the public archive the tutorials use: one command, by hand, checksums, troubleshooting |
+| [`notebooks/01_trajectory_annotation.ipynb`](notebooks/01_trajectory_annotation.ipynb) | annotation on real data, from the 24-hour sample up to the whole six-month archive, with interactive plots |
+| [`notebooks/02_cadp_compression.ipynb`](notebooks/02_cadp_compression.ipynb) | CADP on the paper's data (AIS + WAVEWATCH III sea state, Feb 2016): download links and licences, both modes, the paper's experiments |
+| [`app/README.md`](app/README.md) | the app |
+| [`scripts/README.md`](scripts/README.md) | scripts that process the whole archive end to end |
 
 The modules carry the method in their docstrings: `help(catraj.annotation)`
 for the overview, and `help` on any interpolator for what it does and when
@@ -172,7 +171,7 @@ it applies.
 
 ### Sample data, included
 
-`08_data/sample/` holds a matched 24-hour extract that the tutorial and app both use
+`data/sample/` holds a matched 24-hour extract that the tutorial and app both use
 out of the box:
 
 | | | |
@@ -184,7 +183,7 @@ Both cover 2016-02-05 01:00 → 2016-02-06 01:00 UTC, projected to UTM zone 30N.
 
 **These carry their own licences**, stricter than the code's — the AIS
 extract is CC BY-NC-SA 4.0, so no commercial use. See
-[`08_data/LICENSE.md`](08_data/LICENSE.md). Nothing in `catraj` depends on
+[`data/LICENSE.md`](data/LICENSE.md). Nothing in `catraj` depends on
 them; point it at your own data and the question does not arise.
 
 ### The full archive, downloaded
@@ -195,14 +194,14 @@ on Zenodo, [doi:10.5281/zenodo.1167595](https://doi.org/10.5281/zenodo.1167595)
 and the benchmarks use it. It is not in the repository. Fetch it with:
 
 ```bash
-python 05_tutorials/download_data.py              # ~773 MB; or: annotation (~203 MB) | cadp (~771 MB)
-python 05_tutorials/download_data.py --check      # what is present
+python scripts/download_data.py              # ~773 MB; or: annotation (~203 MB) | cadp (~771 MB)
+python scripts/download_data.py --check      # what is present
 ```
 
 The script uses only the standard library. It verifies each archive against
 the checksum Zenodo publishes, resumes interrupted downloads, and extracts into
-`08_data/zenodo_1167595/`, which git ignores.
-[`05_tutorials/00_getting_the_data.md`](05_tutorials/00_getting_the_data.md)
+`data/zenodo_1167595/`, which git ignores.
+[`docs/getting_the_data.md`](docs/getting_the_data.md)
 covers everything else: which tutorial needs which files, downloading by hand,
 disk space, the order to run things in, troubleshooting, and the licences.
 The AIS data is CC BY-NC-SA 4.0 (no commercial use), and the sea state must be
@@ -237,6 +236,6 @@ extends. `CITATION.cff` has both in machine-readable form.
 contributed upstream.
 
 **Data:** third-party, with its own terms. See
-[`08_data/LICENSE.md`](08_data/LICENSE.md) for the sample, and section 7
-of [`00_getting_the_data.md`](05_tutorials/00_getting_the_data.md) for the
+[`data/LICENSE.md`](data/LICENSE.md) for the sample, and section 7
+of [`getting_the_data.md`](docs/getting_the_data.md) for the
 downloaded archive.

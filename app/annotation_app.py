@@ -10,7 +10,7 @@ maritime sample data is one application, not the scope.
 
 Run it with::
 
-    panel serve 04_app/annotation_app.py --show
+    panel serve app/annotation_app.py --show
 
 The workflow mirrors the method, one tab per stage:
 
@@ -27,7 +27,6 @@ than guesses.
 
 from __future__ import annotations
 
-import sys
 import traceback
 from pathlib import Path
 
@@ -39,7 +38,6 @@ import pandas as pd
 import panel as pn
 
 ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT / "02_src"))
 
 from catraj.annotation import (  # noqa: E402
     DLT,
@@ -61,10 +59,13 @@ from catraj.annotation import (  # noqa: E402
     to_surface,
 )
 
+import catraj.annotation  # noqa: E402  -- for FIGURES below
+
 pn.extension("tabulator", notifications=True, sizing_mode="stretch_width")
 hv.extension("bokeh")
 
-FIGURES = ROOT / "02_src" / "catraj" / "annotation"
+# The flowcharts ship inside the package, so this works however catraj is installed.
+FIGURES = Path(catraj.annotation.__file__).parent
 
 INK, MUTED = "#0d1117", "#656d76"
 ACCENT, GOOD, BAD, CONTEXT = "#0969da", "#1a7f37", "#cf222e", "#e16f24"
@@ -312,16 +313,16 @@ overview_tab = pn.Column(
 # ------------------------------------------------------------ 1. data tab
 
 traj_path = pn.widgets.TextInput(
-    name="Trajectory file", value="08_data/sample/AIS/AIS_DLT_UTM.shp")
+    name="Trajectory file", value="data/sample/AIS/AIS_DLT_UTM.shp")
 station_path = pn.widgets.TextInput(
     name="Context station file",
-    value="08_data/sample/Weather/Weather_Observation_UTM.shp")
+    value="data/sample/Weather/Weather_Observation_UTM.shp")
 traj_dict_path = pn.widgets.TextInput(
     name="Trajectory field descriptions (optional)",
-    value="08_data/sample/AIS/AIS_parameters.txt")
+    value="data/sample/AIS/AIS_parameters.txt")
 station_dict_path = pn.widgets.TextInput(
     name="Context field descriptions (optional)",
-    value="08_data/sample/Weather/Weather_parameters.txt")
+    value="data/sample/Weather/Weather_parameters.txt")
 load_button = pn.widgets.Button(name="Load", button_type="primary", width=120)
 dictionary_status = pn.Column()
 
@@ -864,7 +865,7 @@ run_annotate = pn.widgets.Button(name="Annotate", button_type="primary", width=1
 progress = pn.indicators.Progress(value=0, max=100, visible=False)
 
 export_dir = pn.widgets.TextInput(
-    name="Folder", value=str(ROOT / "10_results" / "03_app_exports"))
+    name="Folder", value=str(ROOT / "results" / "03_app_exports"))
 export_name = pn.widgets.TextInput(name="File name", value="annotated", width=260)
 export_button = pn.widgets.Button(name="Export", button_type="primary", width=120)
 export_status = pn.Column()
@@ -1214,7 +1215,7 @@ def do_export(_=None):
         return
 
     stem = (export_name.value or "annotated").strip()
-    folder = Path(export_dir.value.strip() or (ROOT / "10_results" / "03_app_exports"))
+    folder = Path(export_dir.value.strip() or (ROOT / "results" / "03_app_exports"))
     if not folder.is_absolute():
         folder = ROOT / folder
 

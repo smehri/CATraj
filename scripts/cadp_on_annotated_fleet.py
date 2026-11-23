@@ -1,13 +1,13 @@
 """CADP over the whole annotated fleet.
 
-Reads the annotated archive written by ``05_tutorials/01_trajectory_annotation.ipynb``
+Reads the annotated archive written by ``notebooks/01_trajectory_annotation.ipynb``
 (every AIS position with the weather it met) and compresses each vessel's
 trajectory with Context-Aware Douglas--Peucker, in both modes, writing the
-result to ``10_results/02_cadp_compression/``.
+result to ``results/02_cadp_compression/``.
 
 usage (from the repository root, in the catraj environment)::
 
-    python 06_workflows/01_cadp_on_annotated_fleet.py
+    python scripts/cadp_on_annotated_fleet.py
 
 Settings are the constants below; every run records them in ``summary.json``.
 
@@ -29,7 +29,6 @@ from __future__ import annotations
 
 import json
 import os
-import sys
 import time
 from pathlib import Path
 
@@ -39,12 +38,11 @@ import numpy as np
 import pandas as pd
 
 ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT / "02_src"))
-from catraj.compression import Context, cadp_select, compression_ratio, context_errors  # noqa: E402
+from catraj.compression import Context, cadp_select, compression_ratio, context_errors
 
 # ---- settings -------------------------------------------------------------------------
-SOURCE = ROOT / "10_results" / "01_trajectory_annotation" / "06_fleet_annotated.parquet"
-OUT = ROOT / "10_results" / "02_cadp_compression"
+SOURCE = ROOT / "results" / "01_trajectory_annotation" / "06_fleet_annotated.parquet"
+OUT = ROOT / "results" / "02_cadp_compression"
 EPSILON = 1_000.0                     # metres, the spatial threshold (as in the CADP paper)
 THRESHOLDS = {                        # each in its variable's own units
     "wind_speed": 1.0,                # m/s
@@ -61,7 +59,7 @@ def main():
     started = time.perf_counter()
     if not SOURCE.exists():
         raise SystemExit(f"missing {SOURCE.relative_to(ROOT)} -- run "
-                         "05_tutorials/01_trajectory_annotation.ipynb with EXPORT_FLEET = True")
+                         "notebooks/01_trajectory_annotation.ipynb with EXPORT_FLEET = True")
     fleet = pd.read_parquet(SOURCE).sort_values(["mmsi", "time"], kind="stable")
     fleet = fleet.reset_index(drop=True)
     n = len(fleet)

@@ -1,7 +1,11 @@
-# 01_docs — papers
+# docs — guides and papers
 
-The published papers each module implements, so the code can be checked
-against its source. Only the open-access ones (CC BY) are here.
+[`getting_the_data.md`](getting_the_data.md) explains how to download the
+public archive the notebooks and scripts use: one command, by hand, checksums,
+folder layout and troubleshooting.
+
+`papers/` holds the published papers each module implements, so the code can
+be checked against its source. Only the open-access ones (CC BY) are here.
 
 | file | paper | implemented in |
 |---|---|---|

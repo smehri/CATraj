@@ -1,16 +1,16 @@
 """Launch the annotation UI.
 
-    python 04_app/run_app.py
+    python app/run_app.py
 
-Equivalent to ``panel serve 04_app/annotation_app.py --show``, but it also sets
+Equivalent to ``panel serve app/annotation_app.py --show``, but it also sets
 the MKL threading layer first.  Some Intel MKL builds abort the process with a
 stack buffer overrun the first time a LAPACK routine runs when their threading
 layer is resolved dynamically, and that has to be set before NumPy loads.
 
 Options::
 
-    python 04_app/run_app.py --port 5010     serve on another port
-    python 04_app/run_app.py --no-show       do not open a browser
+    python app/run_app.py --port 5010     serve on another port
+    python app/run_app.py --no-show       do not open a browser
 """
 
 from __future__ import annotations

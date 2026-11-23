@@ -58,18 +58,15 @@ dev = ["catraj[app,movingpandas,test]", "black", "ruff"]
 Repository = "https://github.com/smehri/catraj"
 Issues = "https://github.com/smehri/catraj/issues"
 
-[tool.setuptools.packages.find]
-where = ["02_src"]
-
 [tool.setuptools.package-data]
 catraj = ["py.typed"]
 # Figures ship with the package; the author's working notes do not.
 "catraj.annotation" = ["*.svg"]
 
 [tool.pytest.ini_options]
-testpaths = ["03_tests"]
+testpaths = ["tests"]
 markers = [
-    "data: needs the sample datasets in 08_data/sample/",
+    "data: needs the sample datasets in data/sample/",
     "movingpandas: needs the optional movingpandas dependency",
 ]
 

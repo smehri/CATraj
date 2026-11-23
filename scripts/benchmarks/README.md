@@ -1,4 +1,4 @@
-# 07_benchmarks/ — temporary research scripts
+# scripts/benchmarks/ — temporary research scripts
 
 > **Not for regular use, and not part of `catraj`.**
 > These scripts were written while developing CADP, to evaluate the two
@@ -6,16 +6,16 @@
 > evaluation is finished, and **this folder will be removed** in a later
 > release. Nothing in the library, the app or the tutorials depends on it.
 >
-> To *use* CADP, see [`05_tutorials/02_cadp_compression.ipynb`](../05_tutorials/02_cadp_compression.ipynb)
+> To *use* CADP, see [`notebooks/02_cadp_compression.ipynb`](../../notebooks/02_cadp_compression.ipynb)
 > and `help(catraj.compression)`.
 
 ## What is here
 
 | script | what it does | data it needs |
 |---|---|---|
-| `prepare_feb2016.py` | Builds `08_data/cache/cadp_feb2016.pkl`: February 2016 AIS, de-duplicated and projected to UTM 30N, annotated with bottom depth, wave height, wave direction and sea level (IDW over the 4 nearest grid cells, DLT in time, vectorised; checked against `catraj.annotation.annotate_points`). | Zenodo archive, below |
-| `paper_experiments.py` | Runs CADP on that file in both modes: threshold sweeps for wave direction, wave height and bottom depth (ε = 1 km); both modes and plain Douglas–Peucker tuned to keep the same number of points; runtime at ε = 10 m. | `08_data/cache/cadp_feb2016.pkl` |
-| `equal_size_sample_data.py` | The same equal-size comparison on the 24-hour sample in `08_data/sample/`, over every usable context variable (weather annotated onto AIS, plus speed, course, heading and rate of turn), with a sensitivity check on ε. | `08_data/sample/` only |
+| `prepare_feb2016.py` | Builds `data/cache/cadp_feb2016.pkl`: February 2016 AIS, de-duplicated and projected to UTM 30N, annotated with bottom depth, wave height, wave direction and sea level (IDW over the 4 nearest grid cells, DLT in time, vectorised; checked against `catraj.annotation.annotate_points`). | Zenodo archive, below |
+| `paper_experiments.py` | Runs CADP on that file in both modes: threshold sweeps for wave direction, wave height and bottom depth (ε = 1 km); both modes and plain Douglas–Peucker tuned to keep the same number of points; runtime at ε = 10 m. | `data/cache/cadp_feb2016.pkl` |
+| `equal_size_sample_data.py` | The same equal-size comparison on the 24-hour sample in `data/sample/`, over every usable context variable (weather annotated onto AIS, plus speed, course, heading and rate of turn), with a sensitivity check on ε. | `data/sample/` only |
 
 "Equal size" means each method's parameter is tuned until all of them keep
 the same number of points, so they are compared on *which* points they keep
@@ -27,20 +27,20 @@ of CADP needs.
 From the repository root, in the `catraj` environment:
 
 ```bash
-python 07_benchmarks/equal_size_sample_data.py      # ~2-3 min, no download needed
+python scripts/benchmarks/equal_size_sample_data.py      # ~2-3 min, no download needed
 
-python 07_benchmarks/prepare_feb2016.py             # ~30 s, needs the Zenodo files
-python 07_benchmarks/paper_experiments.py           # ~3 min
+python scripts/benchmarks/prepare_feb2016.py             # ~30 s, needs the Zenodo files
+python scripts/benchmarks/paper_experiments.py           # ~3 min
 ```
 
 The Zenodo files are the ones the CADP tutorial uses. Get them with
-`python 05_tutorials/download_data.py cadp` (or see
-[`05_tutorials/00_getting_the_data.md`](../05_tutorials/00_getting_the_data.md)),
+`python scripts/download_data.py cadp` (or see
+[`docs/getting_the_data.md`](../../docs/getting_the_data.md)),
 so that these exist:
 
 ```
-08_data/zenodo_1167595/P1_AIS_Data/nari_dynamic.csv
-08_data/zenodo_1167595/E1_ocean/oc_february.csv
+data/zenodo_1167595/P1_AIS_Data/nari_dynamic.csv
+data/zenodo_1167595/E1_ocean/oc_february.csv
 ```
 
 ## Data and licences
@@ -56,4 +56,4 @@ so that these exist:
   Boudière, E. et al. (2013). International Journal of Marine Energy 3–4,
   e40–e52. [doi:10.1016/j.ijome.2013.11.010](https://doi.org/10.1016/j.ijome.2013.11.010)
 
-Data stays in `08_data/zenodo_1167595/` and `08_data/cache/`, which git ignores.
+Data stays in `data/zenodo_1167595/` and `data/cache/`, which git ignores.

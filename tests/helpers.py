@@ -1,6 +1,6 @@
 """Plain helpers shared by the tests.
 
-The tests live in ``03_tests/``, which -- starting with a digit -- cannot be a
+The tests live in ``tests/``, which -- starting with a digit -- cannot be a
 Python package, so they import these by name (``from helpers import ...``)
 rather than relatively. pytest puts this folder on ``sys.path``.
 """
@@ -8,7 +8,7 @@ rather than relatively. pytest puts this folder on ``sys.path``.
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-DATASETS = ROOT / "08_data" / "sample"
+DATASETS = ROOT / "data" / "sample"
 
 
 def linear_field(x, y, t=0.0):
