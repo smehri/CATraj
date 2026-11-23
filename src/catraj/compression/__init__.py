@@ -11,6 +11,12 @@ would misrepresent a context variable by more than its threshold is added
 back.  The context it tests is ordinary columns on the trajectory -- written
 by :mod:`catraj.annotation`, or recorded with the positions, like speed.
 
+:mod:`.cpls` implements Context-aware Piecewise Linear Segmentation of
+[Mehri2021]: Douglas--Peucker first, then a pass inside each of its segments
+that keeps any point whose removal would make the simplified trajectory cross
+a barrier -- a shoreline -- that the original did not cross.  The barriers are
+shapely geometries, indexed once by :class:`.Barriers`.
+
 :mod:`.evaluation` scores a compression by its ratio and by DTW similarity.
 
 Each module's docstring carries the part of the method it implements, and the
@@ -25,12 +31,14 @@ from .cadp import (
     context_errors,
     nominal_boundaries,
 )
+from .cpls import Barriers, CplsSelection, cpls_select, segment_crossings
 from .douglas_peucker import douglas_peucker, segment_distances
 from .evaluation import compression_ratio, dtw
 
 __all__ = [
     "compress", "cadp_select", "Context", "Selection",
     "context_errors", "nominal_boundaries",
+    "Barriers", "CplsSelection", "segment_crossings", "cpls_select",
     "douglas_peucker", "segment_distances",
     "compression_ratio", "dtw",
 ]
