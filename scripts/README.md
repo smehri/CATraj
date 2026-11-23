@@ -5,7 +5,7 @@ with the package installed (`pip install -e .`, see the main README).
 
 | script | what it does |
 |---|---|
-| `download_data.py` | downloads the public Zenodo archive into `data/zenodo_1167595/`, verifying checksums ([`docs/getting_the_data.md`](../docs/getting_the_data.md)) |
+| `download_data.py` | downloads the public Zenodo archive (AIS, weather, sea state, coastline) into `data/zenodo_1167595/`, verifying checksums ([`docs/getting_the_data.md`](../docs/getting_the_data.md)) |
 | `cadp_on_annotated_fleet.py` | runs CADP over the whole annotated fleet (below) |
 | [`benchmarks/`](benchmarks/) | temporary research scripts behind the CADP paper's experiments, to be removed |
 

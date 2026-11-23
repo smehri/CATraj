@@ -11,7 +11,9 @@ abstract: >-
   temporal interpolation through time, so every trajectory point carries the
   conditions the moving object passed through -- and Context-Aware
   Douglas-Peucker (CADP) compression, which keeps the points that carry that
-  context.
+  context, and Context-aware Piecewise Linear Segmentation (CPLS) compression,
+  which keeps the points that stop the simplified trajectory crossing a
+  barrier such as a shoreline.
 type: software
 authors:
   - family-names: Mehri
@@ -77,7 +79,7 @@ references:
     end: 45613
     year: 2021
     doi: 10.1109/ACCESS.2021.3066463
-    notes: "CPLS and two-stage CPLS compression, CLSTM. Planned for a future release."
+    notes: "CPLS trajectory compression, implemented in catraj.compression. Two-stage CPLS and CLSTM are planned for a future release."
 
   - type: software
     title: "MovingPandas: Efficient Structures for Movement Data in Python"

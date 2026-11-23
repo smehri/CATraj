@@ -13,9 +13,9 @@ The algorithms apply to **any moving object** — vessels, aircraft, vehicles,
 wildlife, pedestrians. The maritime data in the examples is one application,
 not the scope.
 
-**This release implements trajectory annotation and CADP compression.** The
-other compression and prediction algorithms below are being added in later
-releases.
+**This release implements trajectory annotation, CADP compression and CPLS
+compression.** The other compression and prediction algorithms below are being
+added in later releases.
 
 ---
 
@@ -25,7 +25,7 @@ releases.
 |---|---|---|---|
 | **Annotation** | Attaches context observed at coarse resolution to high-frequency trajectory points. Spatial interpolation across observation stations, then temporal interpolation through time. | 2023 | **implemented** |
 | **CADP** | Context-Aware Douglas–Peucker. Extends DP with three context domains — environmental, internal, semantic — retaining points that carry contextual information a purely spatial criterion would discard. | 2025 | **implemented** |
-| **CPLS** | Context-aware Piecewise Linear Segmentation. Guarantees logical consistency, e.g., a compressed (simplified) vessel trajectory may not cross the shoreline. | 2021 | planned |
+| **CPLS** | Context-aware Piecewise Linear Segmentation. Guarantees logical consistency, e.g., a compressed (simplified) vessel trajectory may not cross the shoreline. | 2021 | **implemented** |
 | **2stage-CPLS** | CPLS plus stay-point preservation. | 2021 | planned |
 | **CLSTM** | Context-aware LSTM. Routes each trajectory to a per-type network, avoiding Simpson's paradox in a single global model. | 2021, 2023 | planned |
 
@@ -146,6 +146,23 @@ Douglas–Peucker result. `mode="iterative"` re-measures after each addition, so
 every dropped point is guaranteed within its thresholds and far fewer points
 are kept; `help(catraj.compression.cadp)` explains the difference.
 
+CPLS also starts from Douglas–Peucker, but it protects topology instead of
+context: it keeps any point whose removal would make the simplified trajectory
+cross a barrier, such as a shoreline, that the original did not cross. Barriers
+are shapely geometries (lines or polygons) or a `GeoDataFrame`, in the same
+projected CRS as the positions:
+
+```python
+from catraj.compression import cpls_compress
+
+land = gpd.read_file("data/sample/Coastline/Coastline_UTM.shp")   # land polygons
+safe = cpls_compress(traj, epsilon=1_000, barriers=land, by="mmsi")
+```
+
+The result is always a superset of the Douglas–Peucker result and introduces no
+crossing that the original trajectory did not already have;
+`help(catraj.compression.cpls)` lists the decisions behind it.
+
 There is also an interactive app, which compares interpolation methods by
 cross-validation before annotating:
 
@@ -158,6 +175,7 @@ python app/run_app.py       # or double-click app/"Run Annotation App.bat"
 | [`docs/getting_the_data.md`](docs/getting_the_data.md) | how to download the public archive the tutorials use: one command, by hand, checksums, troubleshooting |
 | [`notebooks/01_trajectory_annotation.ipynb`](notebooks/01_trajectory_annotation.ipynb) | annotation on real data, from the 24-hour sample up to the whole six-month archive, with interactive plots |
 | [`notebooks/02_cadp_compression.ipynb`](notebooks/02_cadp_compression.ipynb) | CADP on the paper's data (AIS + WAVEWATCH III sea state, Feb 2016): download links and licences, both modes, the paper's experiments |
+| [`notebooks/03_cpls_compression.ipynb`](notebooks/03_cpls_compression.ipynb) | CPLS on the 24-hour sample and a coastline: where Douglas–Peucker cuts across land, what CPLS adds to prevent it, the choice of ε. No download needed |
 | [`app/README.md`](app/README.md) | the app |
 | [`scripts/README.md`](scripts/README.md) | scripts that process the whole archive end to end |
 
@@ -178,11 +196,14 @@ out of the box:
 |---|---|---|
 | AIS positions | 106,894 across 136 vessels | Naval Academy, France — CC-BY-NC-SA-4.0 |
 | Weather observations | 16 coastal stations, hourly | rp5.ua / Met Office / NOAA |
+| Coastline | 175 land polygons, clipped to the AIS area | European Environment Agency — free to re-use, acknowledge the source |
 
-Both cover 2016-02-05 01:00 → 2016-02-06 01:00 UTC, projected to UTM zone 30N.
+AIS and weather cover 2016-02-05 01:00 → 2016-02-06 01:00 UTC; all three layers
+are projected to UTM zone 30N.
 
 **These carry their own licences**, stricter than the code's — the AIS
-extract is CC BY-NC-SA 4.0, so no commercial use. See
+extract is CC BY-NC-SA 4.0, so no commercial use. The coastline (EEA) may be
+re-used freely, provided the source is acknowledged. See
 [`data/LICENSE.md`](data/LICENSE.md). Nothing in `catraj` depends on
 them; point it at your own data and the question does not arise.
 
@@ -191,10 +212,11 @@ them; point it at your own data and the question does not arise.
 The sample is cut from a public six-month archive (October 2015 – March 2016)
 on Zenodo, [doi:10.5281/zenodo.1167595](https://doi.org/10.5281/zenodo.1167595)
 (Ray et al., 2019). The full annotation run, the CADP tutorial, the workflows
-and the benchmarks use it. It is not in the repository. Fetch it with:
+and the benchmarks use it, and so does the optional full-coastline section of
+the CPLS tutorial. It is not in the repository. Fetch it with:
 
 ```bash
-python scripts/download_data.py              # ~773 MB; or: annotation (~203 MB) | cadp (~771 MB)
+python scripts/download_data.py              # ~825 MB; or: annotation (~203 MB) | cadp (~771 MB) | cpls (~53 MB)
 python scripts/download_data.py --check      # what is present
 ```
 
@@ -204,8 +226,8 @@ the checksum Zenodo publishes, resumes interrupted downloads, and extracts into
 [`docs/getting_the_data.md`](docs/getting_the_data.md)
 covers everything else: which tutorial needs which files, downloading by hand,
 disk space, the order to run things in, troubleshooting, and the licences.
-The AIS data is CC BY-NC-SA 4.0 (no commercial use), and the sea state must be
-cited.
+The AIS data is CC BY-NC-SA 4.0 (no commercial use), the sea state must be
+cited, and the EEA coastline needs its source acknowledged.
 
 ---
 

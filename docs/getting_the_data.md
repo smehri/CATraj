@@ -9,7 +9,7 @@ use. Read it before you run anything beyond the 24-hour sample.
 python scripts/download_data.py
 ```
 
-It downloads about 773 MB from Zenodo, checks each file against its published
+It downloads about 825 MB from Zenodo, checks each file against its published
 checksum, and extracts what the code reads into `data/zenodo_1167595/`.
 Running it again is safe: an interrupted download resumes, and files already
 in place are skipped.
@@ -23,10 +23,12 @@ in place are skipped.
 | `notebooks/01_trajectory_annotation.ipynb` with the 24-hour sample (`SOURCE = "sample"`) | `data/sample/`, **already in the repository** | none |
 | `app/` (the annotation app) | `data/sample/`, already in the repository | none |
 | `scripts/benchmarks/equal_size_sample_data.py` | `data/sample/`, already in the repository | none |
+| `notebooks/03_cpls_compression.ipynb` | `data/sample/` (AIS and coastline), already in the repository | none |
 | `notebooks/01_trajectory_annotation.ipynb` with the full archive (`SOURCE = "zenodo"`) | AIS data, AIS codes, weather | `download_data.py annotation` (~203 MB) |
 | `notebooks/02_cadp_compression.ipynb` | AIS data, ocean conditions | `download_data.py cadp` (~771 MB) |
 | `scripts/benchmarks/prepare_feb2016.py`, `paper_experiments.py` | AIS data, ocean conditions | `download_data.py cadp` |
 | `scripts/cadp_on_annotated_fleet.py` | the annotated fleet that tutorial 1 writes (section 5 below) | `download_data.py annotation` |
+| the last section of `notebooks/03_cpls_compression.ipynb` (optional: the full coastline) | European coastline | `download_data.py cpls` (~53 MB) |
 
 With `SOURCE = "auto"`, the default, tutorial 1 uses the full archive if it has
 been downloaded and the sample otherwise. So it runs either way.
@@ -42,7 +44,7 @@ Everything comes from one public Zenodo record:
 
 It covers 1 October 2015 to 31 March 2016, longitude −10° to 0° and latitude
 45° to 51°: the western English Channel and the Bay of Biscay. The record has
-19 archives. `catraj` uses four of them:
+19 archives. `catraj` uses five of them:
 
 | Zenodo file | download | extracted, used here | MD5 (from the record) |
 |---|---|---|---|
@@ -50,6 +52,7 @@ It covers 1 October 2015 to 31 March 2016, longitude −10° to 0° and latitude
 | [`[P1] AIS Status, Codes and Types.zip`](https://zenodo.org/records/1167595/files/%5BP1%5D%20AIS%20Status%2C%20Codes%20and%20Types.zip?download=1) | 8 kB | all 6 files; `Ship Types List.csv` names vessel types | `6f9bb328d6e657b16fea55210a6e56cf` |
 | [`[E2] Weather Conditions.zip`](https://zenodo.org/records/1167595/files/%5BE2%5D%20Weather%20Conditions.zip?download=1) | 1.3 MB | all 5 files (6 MB); 16 coastal stations, hourly | `d8ac0644a670f584daaa4a450cf2baa7` |
 | [`[E1] Ocean Conditions.zip`](https://zenodo.org/records/1167595/files/%5BE1%5D%20Ocean%20Conditions.zip?download=1) | 569.8 MB | `oc_february.csv` (675 MB; WAVEWATCH III sea state, 3-hourly, 43,206 sea points), `README_parameters.txt` | `20a1c8f8a6bbbd9bdf9821f938f22add` |
+| [`[C2] European Coastline.zip`](https://zenodo.org/records/1167595/files/%5BC2%5D%20European%20Coastline.zip?download=1) | 52.6 MB | `Europe Coastline (Polygone).shp` with its `.shx`, `.dbf`, `.prj` (54 MB; 71,514 land polygons, EPSG:3035), `README_parameters.txt` | `52036af60c8427fcda4b867c706bf649` |
 
 The ocean archive holds one file per month, `oc_october.csv` to
 `oc_march.csv`, about 700 MB each. The tutorials use February 2016 only.
@@ -60,9 +63,10 @@ The ocean archive holds one file per month, `oc_october.csv` to
 |---|---|---|
 | `annotation` | 203 MB | 1.2 GB |
 | `cadp` | 771 MB | 1.9 GB |
-| `all` | 773 MB | 1.9 GB |
+| `cpls` | 53 MB | 54 MB |
+| `all` | 825 MB | 2.0 GB |
 
-The archives are kept by default (about 770 MB more), so nothing is downloaded
+The archives are kept by default (about 820 MB more), so nothing is downloaded
 twice. Pass `--remove-zips` to delete each one after it is extracted. Running
 the code adds more output: about 400 MB for `data/cache/cadp_feb2016.pkl` from the
 benchmarks, and up to about 2 GB in `results/`.
@@ -80,6 +84,7 @@ conda activate catraj                               # any Python 3.10+ works; on
 python scripts/download_data.py                # everything
 python scripts/download_data.py annotation     # tutorial 1 only
 python scripts/download_data.py cadp           # tutorial 2 and the benchmarks
+python scripts/download_data.py cpls           # the full coastline for tutorial 3
 python scripts/download_data.py --check        # report what is present, download nothing
 ```
 
@@ -119,6 +124,7 @@ or if you want a download manager.
    curl -L -C - -o P1_AIS_Status_Codes_and_Types.zip  "https://zenodo.org/records/1167595/files/%5BP1%5D%20AIS%20Status%2C%20Codes%20and%20Types.zip?download=1"
    curl -L -C - -o E2_Weather_Conditions.zip          "https://zenodo.org/records/1167595/files/%5BE2%5D%20Weather%20Conditions.zip?download=1"
    curl -L -C - -o E1_Ocean_Conditions.zip            "https://zenodo.org/records/1167595/files/%5BE1%5D%20Ocean%20Conditions.zip?download=1"
+   curl -L -C - -o C2_European_Coastline.zip          "https://zenodo.org/records/1167595/files/%5BC2%5D%20European%20Coastline.zip?download=1"
    ```
 
 2. **Verify** each file against the MD5 in section 2. A mismatch means the
@@ -139,15 +145,17 @@ or if you want a download manager.
    unzip -n P1_AIS_Status_Codes_and_Types.zip -d P1_AIS_Codes
    unzip -n E2_Weather_Conditions.zip -d E2_Weather_Conditions
    unzip -n E1_Ocean_Conditions.zip oc_february.csv README_parameters.txt -d E1_ocean
+   unzip -n C2_European_Coastline.zip "Europe Coastline (Polygone).*" README_parameters.txt -d C2_European_Coastline
    ```
 
    ```powershell
    # Windows 10+ (tar reads zip files; create the folders first)
-   mkdir P1_AIS_Data, P1_AIS_Codes, E2_Weather_Conditions, E1_ocean
+   mkdir P1_AIS_Data, P1_AIS_Codes, E2_Weather_Conditions, E1_ocean, C2_European_Coastline
    tar -xf P1_AIS_Data.zip -C P1_AIS_Data nari_dynamic.csv nari_static.csv README_parameters.txt
    tar -xf P1_AIS_Status_Codes_and_Types.zip -C P1_AIS_Codes
    tar -xf E2_Weather_Conditions.zip -C E2_Weather_Conditions
    tar -xf E1_Ocean_Conditions.zip -C E1_ocean oc_february.csv README_parameters.txt
+   tar -xf C2_European_Coastline.zip -C C2_European_Coastline "Europe Coastline (Polygone).shp" "Europe Coastline (Polygone).shx" "Europe Coastline (Polygone).dbf" "Europe Coastline (Polygone).prj" README_parameters.txt
    ```
 
 4. **Check** that it is all in place:
@@ -163,7 +171,7 @@ committed 24-hour sample in `sample/`.
 
 ```
 data/
-├── sample/                           the 24-hour sample, committed (not used here)
+├── sample/                           the sample (AIS, Weather, Coastline), committed (not used here)
 ├── cache/                            files the benchmarks build, e.g. cadp_feb2016.pkl
 └── zenodo_1167595/
     ├── P1_AIS_Data/
@@ -176,8 +184,11 @@ data/
     │   ├── table_wheatherObservation.csv   hourly observations (the misspelling is the archive's)
     │   ├── table_weatherStation.csv        station positions
     │   └── README_parameters.txt           field descriptions        tutorial 1
-    └── E1_ocean/
-        ├── oc_february.csv           sea state, Feb 2016       tutorial 2 · benchmarks
+    ├── E1_ocean/
+    │   ├── oc_february.csv           sea state, Feb 2016       tutorial 2 · benchmarks
+    │   └── README_parameters.txt
+    └── C2_European_Coastline/
+        ├── Europe Coastline (Polygone).shp   (+ .shx .dbf .prj)  land polygons   tutorial 3 (optional section)
         └── README_parameters.txt
 ```
 
@@ -232,7 +243,13 @@ terms.
   database for the design of Marine energy converters.* International Journal
   of Marine Energy 3–4, e40–e52. [doi:10.1016/j.ijome.2013.11.010](https://doi.org/10.1016/j.ijome.2013.11.010)
 * **Weather** ([E2], rp5.ua, from Met Office / NOAA data): public; cite the source.
+* **European coastline** ([C2], European Environment Agency, "EEA coastline for
+  analysis", version 08/07/2013, derived from EU-Hydro and GSHHG): the EEA's
+  standard re-use policy allows re-use for commercial or non-commercial
+  purposes, free of charge, **provided the source is acknowledged**. Copyright
+  holder: Directorate-General for Environment (DG ENV).
+  <http://www.eea.europa.eu/legal/copyright>
 
 If you publish work that uses this data, cite Ray et al. (2019) above as well.
-The 24-hour sample in `data/sample/` is cut from the same archive, under the
-same terms ([`data/LICENSE.md`](../data/LICENSE.md)).
+The sample in `data/sample/` (24 hours of AIS and weather, and the clipped
+coastline) is cut from the same archive, under the same terms ([`data/LICENSE.md`](../data/LICENSE.md)).
