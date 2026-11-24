@@ -16,6 +16,6 @@ import os as _os
 
 _os.environ.setdefault("MKL_THREADING_LAYER", "SEQUENTIAL")
 
-from . import annotation, compression
+from . import annotation, compression, preprocessing
 
-__all__ = ["annotation", "compression", "__version__"]
+__all__ = ["annotation", "compression", "preprocessing", "__version__"]
