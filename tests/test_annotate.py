@@ -227,3 +227,106 @@ def test_annotate_a_movingpandas_trajectory(station_frame):
     assert traj.df["ctx"].to_numpy() == pytest.approx(expected, abs=1e-6)
     # Context survives the .iloc slicing compression performs.
     assert traj.df.iloc[::3]["ctx"].to_numpy() == pytest.approx(expected[::3], abs=1e-6)
+
+
+# ------------------------------- station series filtered first (default 30 s)
+
+
+def _burst_stations(circular=False, seed=0):
+    """Two stations reporting every 10 s for two minutes, rows shuffled."""
+    rng = np.random.default_rng(seed)
+    rows = []
+    for k, (x, y) in enumerate([(0.0, 0.0), (20_000.0, 5_000.0)]):
+        t = 1000.0 + np.arange(13) * 10.0
+        base = 100.0 + 50.0 * k if circular else 5.0 + 10.0 * k
+        value = base + rng.normal(scale=1.0, size=t.size)
+        value[6] += 90.0 if circular else 40.0  # a spike
+        rows.append(pd.DataFrame({"x": x, "y": y, "t": t, "value": value}))
+    stations = pd.concat(rows, ignore_index=True)
+    return stations.iloc[rng.permutation(len(stations))].reset_index(drop=True)
+
+
+def _median_reference(stations, window):
+    out = stations.copy()
+    for i, row in stations.iterrows():
+        mine = stations[(stations.x == row.x) & (stations.y == row.y)]
+        near = mine[(mine.t - row.t).abs() <= window / 2].value
+        out.loc[i, "value"] = np.median(near.to_numpy())
+    return out
+
+
+def test_each_station_series_is_median_filtered_on_its_own():
+    from catraj.annotation.annotate import _filter_stations
+
+    stations = _burst_stations()
+    got = _filter_stations(stations, 30, False)
+    pd.testing.assert_frame_equal(got, _median_reference(stations, 30))
+    assert got.index.equals(stations.index)
+    assert (got.value != stations.value).any()
+    assert _filter_stations(stations, None, False) is stations
+
+
+def test_a_station_spike_does_not_reach_the_annotation_by_default():
+    stations = _burst_stations()
+    x = np.array([10_000.0, 10_000.0])
+    y = np.array([2_500.0, 2_500.0])
+    t = np.array([1060.0, 1100.0])
+    raw = annotate_points(stations, x, y, t, filter_window=None)
+    out = annotate_points(stations, x, y, t)
+    assert out[0] < raw[0] - 5.0  # the spike at t = 1060 is gone
+    clean = _median_reference(stations, 30)
+    assert out == pytest.approx(annotate_points(clean, x, y, t, filter_window=None))
+    assert out == pytest.approx(annotate_points(stations, x, y, t, filter_window=30))
+
+
+def test_hourly_stations_are_unchanged_by_the_default_window(station_frame):
+    x, y, t = _track()
+    default = annotate_points(station_frame, x, y, t, temporal_method=Spline())
+    off = annotate_points(station_frame, x, y, t, temporal_method=Spline(),
+                          filter_window=None)
+    assert np.array_equal(default, off)
+
+
+def test_station_bearings_are_filtered_through_their_unit_vector():
+    from catraj.annotation.annotate import _filter_stations
+
+    t = 1000.0 + np.arange(5) * 10.0
+    stations = pd.DataFrame({"x": 0.0, "y": 0.0, "t": t,
+                             "value": [359.0, 1.0, 359.0, 1.0, 359.0]})
+    ordinary = _filter_stations(stations, 40, False)
+    bearing = _filter_stations(stations, 40, True)
+    assert (ordinary.value > 100).all()
+    assert (np.minimum(bearing.value, 360 - bearing.value) < 2).all()
+    assert ((bearing.value >= 0) & (bearing.value < 360)).all()
+
+
+def test_annotate_passes_the_filter_window_through():
+    stations = _burst_stations()
+    gdf = gpd.GeoDataFrame(
+        geometry=gpd.points_from_xy([10_000.0] * 3, [2_500.0] * 3),
+        index=pd.to_datetime([1040.0, 1060.0, 1100.0], unit="s"),
+    )
+    a = annotate(gdf.copy(), stations, "v")
+    b = annotate(gdf.copy(), stations, "v", filter_window=None)
+    c = annotate_points(stations, gdf.geometry.x, gdf.geometry.y,
+                        [1040.0, 1060.0, 1100.0])
+    assert a["v"].to_numpy() == pytest.approx(c)
+    assert not np.allclose(a["v"], b["v"])
+
+
+def test_the_station_window_is_validated():
+    stations = _burst_stations()
+    for bad in (0, -1, np.nan):
+        with pytest.raises(ValueError, match="window"):
+            annotate_points(stations, [0.0], [0.0], [1000.0], filter_window=bad)
+
+
+def test_hourly_station_bearings_are_exactly_unchanged_by_the_default(station_frame):
+    stations = station_frame.assign(value=(station_frame.value * 7.3) % 360.0)
+    x, y, t = _track()
+    default = annotate_points(stations, x, y, t, circular=True)
+    off = annotate_points(stations, x, y, t, circular=True, filter_window=None)
+    assert np.array_equal(default, off)
+    from catraj.annotation.annotate import _filter_stations
+
+    assert np.array_equal(_filter_stations(stations, 30, True).value, stations.value)

@@ -675,7 +675,8 @@ def test_cpls_on_the_sample_fleet():
     land = Barriers(gpd.read_file(DATASETS / "Coastline" / "Coastline_UTM.shp"))
     # The barrier relations over the whole fleet; every relation is checked on
     # moving vessels below (moored ones are slow with all of them).
-    out = cpls_compress(ais, 1_000, land, by="sourcemmsi", **BARRIERS_ONLY)
+    out = cpls_compress(ais, 1_000, land, by="sourcemmsi", filter_window=None,
+                        **BARRIERS_ONLY)
 
     dp_index, dp_new, cpls_new = [], 0, 0
     for _, g in ais.groupby("sourcemmsi", sort=False):
@@ -706,3 +707,68 @@ def test_every_relation_on_moving_sample_vessels():
         assert (sel.mask >= sel.dp).all()
         assert not segment_crossings(x, y, land, keep=sel.mask, new_only=True).any()
         _check_signature(x, y, sel.mask, list(land.geometry))
+
+
+# ----------------------------------------- filtering first (default, 30 s)
+
+
+def _spiky_frame(n=60):
+    x = np.arange(n) * 100.0
+    y = np.zeros(n)
+    y[30] = 500.0
+    return gpd.GeoDataFrame(
+        {"vid": 1}, geometry=gpd.points_from_xy(x, y),
+        index=pd.to_datetime(1_454_000_000 + np.arange(n) * 10.0, unit="s"),
+        crs=32630,
+    )
+
+
+def test_cpls_compress_filters_the_positions_first_by_default():
+    gdf = _spiky_frame()
+    raw = cpls_compress(gdf, 50.0, [], filter_window=None)
+    out = cpls_compress(gdf, 50.0, [])
+    assert gdf.index[30] in raw.index and gdf.index[30] not in out.index
+    assert (out.geometry.y == 0.0).all()  # the rows carry the filtered geometry
+    assert out.equals(cpls_compress(gdf, 50.0, [], filter_window=30))
+
+
+def test_cpls_compress_without_filtering_is_the_unfiltered_algorithm():
+    gdf = _spiky_frame()
+    mask = cpls_select(gdf.geometry.x.to_numpy(), gdf.geometry.y.to_numpy(),
+                       50.0, []).mask
+    out = cpls_compress(gdf, 50.0, [], filter_window=None)
+    assert out.equals(gdf.iloc[mask])
+
+
+def test_cpls_compress_reads_time_from_a_column_or_the_index():
+    gdf = _spiky_frame()
+    plain = gdf.reset_index(drop=True)
+    with pytest.raises(ValueError, match="time_column"):
+        cpls_compress(plain, 50.0, [])
+    plain["clock"] = np.arange(len(plain)) * 10.0
+    out = cpls_compress(plain, 50.0, [], time_column="clock")
+    want = cpls_compress(gdf, 50.0, [])
+    assert out.index.tolist() == [gdf.index.get_loc(k) for k in want.index]
+    assert len(cpls_compress(plain, 50.0, [], filter_window=None)) > len(out)
+
+
+def test_cpls_compress_by_group_filters_each_group():
+    a, b = _spiky_frame(), _spiky_frame()
+    b["vid"] = 2
+    out = cpls_compress(pd.concat([a, b]), 50.0, [], by="vid")
+    assert out[out.vid == 1].equals(cpls_compress(a, 50.0, []))
+    assert out[out.vid == 2].equals(cpls_compress(b, 50.0, []))
+
+
+@pytest.mark.movingpandas
+def test_cpls_compress_passes_the_filter_window_to_trajectories_and_collections():
+    mpd = pytest.importorskip("movingpandas")
+    gdf = _spiky_frame()
+    traj = mpd.Trajectory(gdf, traj_id="v1")
+    coll = mpd.TrajectoryCollection([traj])
+    for window in (None, 30):
+        want = cpls_compress(gdf, 50.0, [], filter_window=window)
+        got = cpls_compress(traj, 50.0, [], filter_window=window)
+        assert got.df.index.equals(want.index)
+        again = cpls_compress(coll, 50.0, [], filter_window=window).trajectories[0]
+        assert again.df.index.equals(want.index)

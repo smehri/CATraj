@@ -8,6 +8,20 @@ the trajectory.
 No model selection happens here.  The caller supplies the methods -- chosen by
 :mod:`.spatial_evaluation` and :mod:`.annotation_evaluation`, or simply known
 in advance -- and annotation applies them.
+
+Filtering first (decided with the author, 2026-11-24)
+-----------------------------------------------------
+
+:func:`annotate_points` and :func:`annotate` take ``filter_window``, 30 by
+default (``None`` for none): each station's observation series is
+median-filtered over time, before interpolation, with
+:func:`catraj.preprocessing.rolling_filter` (bearings through their unit
+vectors when ``circular``).  Stations are told apart by their ``(x, y)``.  The
+positions being annotated are not filtered: context is interpolated from
+stations kilometres apart, so moving a position by metres changes nothing
+measurable, and :func:`annotate_points` gets positions of possibly many
+objects, with no identifier to group them by.  Hourly station data are
+unchanged by a 30-second window, since each window holds one observation.
 """
 
 from __future__ import annotations
@@ -18,6 +32,7 @@ import numpy as np
 
 from .._parallel import run_parallel
 from .._time import times_of
+from ..preprocessing.filtering import rolling_filter
 from .interpolators import DLT
 from .spatial import IDW
 
@@ -76,6 +91,7 @@ def annotate_points(
     group_positions=True,
     chunk_epochs="auto",
     n_jobs=1,
+    filter_window=30,
 ):
     """Estimate context at scattered ``(x, y, t)`` points.
 
@@ -113,6 +129,28 @@ def annotate_points(
     serially, ``-1`` uses every core.  The result is the same either way.
     Without chunking there is a single block, and ``n_jobs`` has no effect.
 
+    **The station series are median-filtered first**, by default (decided with
+    the author, 2026-11-24, when filtering became a default step of every
+    processing function).  Each station's observations -- the rows sharing one
+    ``(x, y)`` -- are replaced over time by the median of those within
+    ``filter_window / 2`` of them, before any interpolation; bearings
+    (``circular=True``) through their unit vectors.  ``filter_window=None``
+    switches it off and restores the unfiltered result exactly.  The unit is
+    that of ``stations["t"]``, seconds for UNIX times.  Observations are
+    typically hourly, so a 30 second window holds one observation and changes
+    nothing there; it matters for stations that report every few seconds.
+    The positions are *not* filtered here: context is interpolated from
+    stations kilometres apart, so moving a position by metres changes nothing
+    measurable, and this function receives positions of possibly many objects,
+    with no identifier to group them by.  Filter them first with
+    :func:`catraj.preprocessing.denoise` if you want to.
+
+    Parameters
+    ----------
+    filter_window : float or None
+        Width of the station filter, in the unit of ``stations["t"]``; ``30``
+        by default, ``None`` for none.
+
     Returns
     -------
     ndarray
@@ -130,6 +168,7 @@ def annotate_points(
     if x.size == 0:
         return out
 
+    stations = _filter_stations(stations, filter_window, circular)
     epochs = np.sort(stations["t"].unique()).astype(float)
     chunk = _chunk_size(chunk_epochs, epochs.size, x.size)
     if chunk is None or epochs.size <= chunk:
@@ -154,6 +193,38 @@ def annotate_points(
                           temporal=temporal, group_positions=group_positions)
     for idx, block_values in zip(pieces, values):
         out[idx] = block_values
+    return out
+
+
+def _filter_stations(stations, window, circular):
+    """Median-filter each station's observations over time.
+
+    A station is the rows sharing one ``(x, y)``.  Rows keep their order and
+    index; only ``value`` changes, and only where a window holds more than one
+    observation.
+    """
+    if window is None or len(stations) == 0:
+        return stations
+    t = stations["t"].to_numpy(dtype=float)
+    values = stations["value"].to_numpy(dtype=float, na_value=np.nan)
+    codes = stations.groupby(["x", "y"], sort=False, dropna=False).ngroup()
+    codes = codes.to_numpy()
+    order = np.lexsort((t, codes))  # by station, then time; ties keep their order
+    cuts = np.flatnonzero(np.diff(codes[order])) + 1
+    done = values.copy()
+    # A station whose observations are all further apart than half the window
+    # is returned as it is; only stations with a close pair are filtered.
+    if not np.isfinite(window) or window <= 0:
+        raise ValueError("window must be a positive, finite duration")
+    close = (np.diff(codes[order]) == 0) & (np.diff(t[order]) <= window / 2)
+    busy = set(codes[order][1:][close].tolist())
+    for rows in np.split(order, cuts):
+        if int(codes[rows[0]]) in busy:
+            done[rows] = rolling_filter(
+                t[rows], values[rows], window, circular=circular
+            )
+    out = stations.copy()
+    out["value"] = done
     return out
 
 
@@ -248,6 +319,7 @@ def annotate(
     circular=False,
     chunk_epochs="auto",
     n_jobs=1,
+    filter_window=30,
 ):
     """Annotate a MovingPandas trajectory, or a GeoDataFrame, with context.
 
@@ -272,6 +344,11 @@ def annotate(
         Process long inputs in time blocks; see :func:`annotate_points`.
     n_jobs : int
         Processes for those blocks; ``-1`` uses every core.
+    filter_window : float or None
+        Width of the median filter applied to each station's observation
+        series before interpolation: ``30`` by default, ``None`` for none.
+        The trajectory's own positions are not filtered; see
+        :func:`annotate_points`.
 
     Returns
     -------
@@ -291,6 +368,7 @@ def annotate(
         circular=circular,
         chunk_epochs=chunk_epochs,
         n_jobs=n_jobs,
+        filter_window=filter_window,
     )
     df[column] = values
     return traj

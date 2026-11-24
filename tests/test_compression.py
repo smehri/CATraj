@@ -442,3 +442,98 @@ def test_cadp_on_an_annotated_sample_vessel():
     assert len(dp) <= len(cadp) < len(track)
     assert set(dp.index) <= set(cadp.index)
     assert dtw(track, cadp) <= dtw(track, dp)
+
+
+# ----------------------------------------- filtering first (default, 30 s)
+
+
+def _spiky(n=60):
+    """A straight track every 10 s with one position spike and one value spike."""
+    x = np.arange(n) * 100.0
+    y = np.zeros(n)
+    y[30] = 500.0
+    wave = np.full(n, 1.0)
+    wave[20] = 5.0
+    return gpd.GeoDataFrame(
+        {"wave_height": wave, "wave_dir": np.where(np.arange(n) % 2, 5.0, 355.0),
+         "state": np.where(np.arange(n) < 40, 0, 1), "vid": 1},
+        geometry=gpd.points_from_xy(x, y),
+        index=pd.to_datetime(1_454_000_000 + np.arange(n) * 10.0, unit="s"),
+        crs=32630,
+    )
+
+
+def test_compress_filters_the_geometry_before_selecting_by_default():
+    gdf = _spiky()
+    raw = compress(gdf, 50.0, filter_window=None)
+    out = compress(gdf, 50.0)
+    assert gdf.index[30] in raw.index  # the spike, unfiltered
+    assert out.index.tolist() == [gdf.index[0], gdf.index[-1]]
+    assert (out.geometry.y == 0.0).all()  # rows carry the filtered geometry
+    assert out.equals(compress(gdf, 50.0, filter_window=30))
+
+
+def test_compress_without_filtering_is_the_unfiltered_algorithm():
+    gdf = _spiky()
+    t = (gdf.index - pd.Timestamp("1970-01-01")) / pd.Timedelta(seconds=1)
+    sel = cadp_select(gdf.geometry.x, gdf.geometry.y, t, 50.0,
+                      contexts=[Context(gdf.wave_height, 0.5)])
+    out = compress(gdf, 50.0, thresholds={"wave_height": 0.5}, filter_window=None)
+    assert out.index.equals(gdf.index[sel.mask])
+    assert out.equals(gdf.iloc[sel.mask])
+
+
+def test_compress_filters_threshold_columns_and_the_rows_carry_them():
+    gdf = _spiky()
+    raw = compress(gdf, 1e6, thresholds={"wave_height": 0.5}, filter_window=None)
+    out = compress(gdf, 1e6, thresholds={"wave_height": 0.5})
+    assert gdf.index[20] in raw.index and gdf.index[20] not in out.index
+    assert (out.wave_height == 1.0).all()
+
+
+def test_compress_filters_bearings_on_the_circle():
+    gdf = _spiky()
+    out = compress(gdf, 1e6, thresholds={"wave_dir": 0.5}, circular=["wave_dir"])
+    assert ((out.wave_dir >= 0) & (out.wave_dir < 360)).all()
+    # 355 and 5 degrees alternate; through the unit vector they stay near
+    # north, where an ordinary median would give values near 180.
+    assert (np.minimum(out.wave_dir, 360 - out.wave_dir) < 10).all()
+
+
+def test_compress_leaves_nominal_columns_unfiltered():
+    gdf = _spiky()
+    out = compress(gdf, 1e6, nominal=["state"])
+    assert (out.state == gdf.loc[out.index, "state"]).all()
+    assert out.state.dtype == gdf.state.dtype
+    assert gdf.index[39] in out.index and gdf.index[40] in out.index
+
+
+def test_compress_by_group_filters_each_group():
+    a, b = _spiky(), _spiky()
+    b["vid"] = 2
+    out = compress(pd.concat([a, b]), 50.0, by="vid")
+    assert out[out.vid == 1].equals(compress(a, 50.0))
+    assert out[out.vid == 2].equals(compress(b, 50.0))
+
+
+def test_compress_filtering_needs_times():
+    gdf = _spiky().reset_index(drop=True)
+    with pytest.raises(ValueError, match="time_column"):
+        compress(gdf, 50.0)
+    gdf["clock"] = np.arange(len(gdf)) * 10.0
+    assert len(compress(gdf, 50.0, time_column="clock")) == 2
+    assert len(compress(gdf, 50.0, time_column="clock", filter_window=None)) > 2
+    assert len(compress(gdf.drop(columns="clock"), 50.0, filter_window=None)) > 2
+
+
+@pytest.mark.movingpandas
+def test_compress_passes_the_filter_window_to_trajectories_and_collections():
+    mpd = pytest.importorskip("movingpandas")
+    gdf = _spiky()
+    traj = mpd.Trajectory(gdf, traj_id="v1")
+    coll = mpd.TrajectoryCollection([traj])
+    for window in (None, 30):
+        want = compress(gdf, 50.0, filter_window=window)
+        assert compress(traj, 50.0, filter_window=window).df.index.equals(want.index)
+        got = compress(coll, 50.0, filter_window=window).trajectories[0]
+        assert got.df.index.equals(want.index)

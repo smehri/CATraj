@@ -82,6 +82,22 @@ Edge cases, decided here:
 * Points between two retained points that share one timestamp are compared
   with the midpoint of the two values (on the circle for bearings), since a
   time fraction is undefined there.
+
+Filtering first (decided with the author, 2026-11-24)
+-----------------------------------------------------
+
+Raw AIS is noisy, and a noisy speed or position is compared against a
+threshold as if it were the truth.  So :func:`compress`, the dataframe-level
+step, first median-filters its inputs with :func:`catraj.preprocessing.denoise`:
+the geometry and every numeric threshold column, over a centred time window of
+``filter_window`` seconds, 30 by default; ``None`` switches it off and gives
+the unfiltered result exactly.  Bearings listed in ``circular`` are filtered
+through their unit vector; nominal columns are not filtered.  The compressed
+rows carry the filtered geometry and the filtered columns: preprocess, then
+compress.  Time comes from ``time_column`` or a DatetimeIndex; any other index
+raises a ``ValueError``, since a window in seconds on row numbers would be
+wrong.  The array-level :func:`cadp_select` is the published algorithm on the
+arrays it is given and filters nothing.
 """
 
 from __future__ import annotations
@@ -92,7 +108,9 @@ import numpy as np
 import pandas as pd
 
 from .._time import times_of
+from .._crs import _check_geographic
 from ..annotation._circular import angular_residual
+from ..preprocessing.filtering import denoise
 from .douglas_peucker import douglas_peucker
 
 __all__ = [
@@ -378,12 +396,7 @@ def cadp_select(x, y, t, epsilon, contexts=(), nominal=(), mode="post"):
 
 
 def _select_frame(df, epsilon, thresholds, circular, nominal, time_column, mode):
-    crs = getattr(df, "crs", None)
-    if crs is not None and crs.is_geographic:
-        raise ValueError(
-            "the trajectory is in a geographic CRS; epsilon is a distance, so "
-            "reproject to a projected CRS in metres first (e.g. .to_crs(...))"
-        )
+    _check_geographic(df)
     t = (
         df[time_column].to_numpy(dtype=float)
         if time_column is not None
@@ -410,6 +423,7 @@ def compress(
     time_column=None,
     by=None,
     mode="post",
+    filter_window=30,
 ):
     """Compress trajectories with CADP.
 
@@ -441,10 +455,15 @@ def compress(
     mode : {"post", "iterative"}
         ``post`` is the published method; ``iterative`` re-measures after
         each addition.  See the module docstring.
+    filter_window : float or None
+        Width, in seconds (the unit of the times), of the time-windowed median
+        applied before selection: ``30`` by default, ``None`` for no
+        filtering.  See "Filtering first" in the module docstring.
 
     Returns
     -------
-    The same kind of object, holding only the retained points.
+    The same kind of object, holding only the retained points; with
+    filtering on, their geometry and threshold columns are the filtered ones.
     """
     circular = set(circular)
     nominal = list(nominal)
@@ -453,26 +472,30 @@ def compress(
         raise ValueError(f"circular columns without a threshold: {sorted(unknown)}")
     args = (epsilon, thresholds, circular, nominal, time_column, mode)
 
+    def one(df):
+        if filter_window is not None:
+            df = denoise(
+                df, filter_window, columns=list(thresholds or {}),
+                circular=circular, time_column=time_column,
+            )
+        return df.iloc[_select_frame(df, *args).mask]
+
     if hasattr(traj, "trajectories"):  # TrajectoryCollection
         import movingpandas as mpd
 
         return mpd.TrajectoryCollection([
             compress(tr, epsilon, thresholds, circular, nominal, time_column,
-                     mode=mode)
+                     mode=mode, filter_window=filter_window)
             for tr in traj.trajectories
         ])
 
     if hasattr(traj, "df") and hasattr(traj, "id"):  # Trajectory
         import movingpandas as mpd
 
-        mask = _select_frame(traj.df, *args).mask
-        return mpd.Trajectory(traj.df.iloc[mask].copy(), traj.id)
+        return mpd.Trajectory(one(traj.df).copy(), traj.id)
 
     if by is not None:
-        parts = [
-            group.iloc[_select_frame(group, *args).mask]
-            for _, group in traj.groupby(by, sort=False)
-        ]
+        parts = [one(group) for _, group in traj.groupby(by, sort=False)]
         return pd.concat(parts) if parts else traj.iloc[:0]
 
-    return traj.iloc[_select_frame(traj, *args).mask].copy()
+    return one(traj).copy()

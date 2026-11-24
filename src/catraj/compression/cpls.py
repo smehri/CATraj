@@ -131,10 +131,26 @@ What it costs
 D6 and D7 act on the track itself, with or without barriers.  On raw AIS the
 GPS jitter of a moored vessel crosses itself thousands of times, and keeping
 those crossings keeps most of its points: on the 24-hour sample at 1 km, the
-barrier relations alone keep 607 of 106,894 points, all relations 43,074.
+barrier relations alone keep 607 of 106,894 points, all relations 43,074
+(unfiltered, ``filter_window=None``; with the default 30 s median, 604 and
+35,020; about 3 s and 40 s unfiltered).
 The paper's two-stage CPLS replaces stay points by their centroid first, which
-removes that jitter; until then, switch D6 and D7 off for raw data with long
-stops if compression matters more than the track's own topology.
+removes that jitter (see :mod:`.two_stage`); otherwise switch D6 and D7 off for
+raw data with long stops if compression matters more than the track's own
+topology.
+
+Filtering first (decided with the author, 2026-11-24)
+-----------------------------------------------------
+
+:func:`cpls_compress`, the dataframe-level step, first denoises the positions
+with :func:`catraj.preprocessing.denoise`: a centred median over
+``filter_window`` seconds, 30 by default; ``None`` switches it off and gives
+the unfiltered result exactly.  CPLS then runs on the filtered track, and the
+result rows carry the filtered geometry.  Time comes from ``time_column`` or a
+DatetimeIndex (CPLS itself does not use time); any other index raises a
+``ValueError``.  The guarantees below hold for the filtered track; the
+filtered track is not the raw one.  :func:`cpls_select`, the algorithm on
+arrays, filters nothing.
 
 What the result guarantees
 --------------------------
@@ -185,6 +201,8 @@ import numpy as np
 import pandas as pd
 import shapely
 
+from .._crs import _check_crs
+from ..preprocessing.filtering import denoise
 from .douglas_peucker import douglas_peucker
 
 __all__ = [
@@ -879,31 +897,22 @@ _RULE_NAMES = {
 
 
 def _select_frame(df, epsilon, barriers, rules):
-    crs = getattr(df, "crs", None)
-    if crs is not None and crs.is_geographic:
-        raise ValueError(
-            "the trajectory is in a geographic CRS; epsilon is a distance, so "
-            "reproject to a projected CRS in metres first (e.g. .to_crs(...))"
-        )
-    if crs is not None and barriers.crs is not None:
-        from pyproj import CRS
-
-        if CRS.from_user_input(barriers.crs) != CRS.from_user_input(crs):
-            raise ValueError(
-                "the barriers and the trajectory are in different CRS; "
-                "reproject the barriers with .to_crs(...) to the trajectory's"
-            )
+    _check_crs(df, barriers)
     geom = df.geometry
     return cpls_select(
         geom.x.to_numpy(), geom.y.to_numpy(), epsilon, barriers, **rules
     )
 
 
-def cpls_compress(traj, epsilon, barriers, by=None, **rules):
+def cpls_compress(
+    traj, epsilon, barriers, by=None, *, filter_window=30, time_column=None,
+    **rules,
+):
     """Compress trajectories with CPLS.
 
     The result is a row subset of the input, so every column of every retained
-    point survives.  CPLS does not use time: row order is trajectory order.
+    point survives.  CPLS itself does not use time: row order is trajectory
+    order.  Time matters only to the filtering that runs first.
 
     Parameters
     ----------
@@ -918,6 +927,14 @@ def cpls_compress(traj, epsilon, barriers, by=None, **rules):
     by : str, optional
         For a GeoDataFrame holding several trajectories: the column naming
         each one.  Each is compressed on its own.
+    filter_window : float or None
+        Width, in seconds (the unit of the times), of the time-windowed median
+        that denoises the positions before CPLS runs: ``30`` by default,
+        ``None`` for no filtering.  See "Filtering first" above.
+    time_column : str, optional
+        Numeric time column (UNIX seconds) for the filter; the index
+        otherwise, which must then be a DatetimeIndex (as MovingPandas keeps
+        it).  Unused when ``filter_window`` is ``None``.
     **rules
         ``topology``, ``direction``, ``avoid_self_intersection``,
         ``keep_self_intersection``, ``inversion``: switch a relation of the
@@ -925,32 +942,35 @@ def cpls_compress(traj, epsilon, barriers, by=None, **rules):
 
     Returns
     -------
-    The same kind of object, holding only the retained points.
+    The same kind of object, holding only the retained points; with filtering
+    on, their geometry is the filtered one.
     """
     unknown = set(rules) - _RULE_NAMES
     if unknown:
         raise TypeError(f"unknown relation(s): {sorted(unknown)}")
     barriers = _as_barriers(barriers)
 
+    def one(df):
+        if filter_window is not None:
+            df = denoise(df, filter_window, time_column=time_column)
+        return df.iloc[_select_frame(df, epsilon, barriers, rules).mask]
+
     if hasattr(traj, "trajectories"):  # TrajectoryCollection
         import movingpandas as mpd
 
         return mpd.TrajectoryCollection([
-            cpls_compress(tr, epsilon, barriers, **rules)
+            cpls_compress(tr, epsilon, barriers, filter_window=filter_window,
+                          time_column=time_column, **rules)
             for tr in traj.trajectories
         ])
 
     if hasattr(traj, "df") and hasattr(traj, "id"):  # Trajectory
         import movingpandas as mpd
 
-        mask = _select_frame(traj.df, epsilon, barriers, rules).mask
-        return mpd.Trajectory(traj.df.iloc[mask].copy(), traj.id)
+        return mpd.Trajectory(one(traj.df).copy(), traj.id)
 
     if by is not None:
-        parts = [
-            group.iloc[_select_frame(group, epsilon, barriers, rules).mask]
-            for _, group in traj.groupby(by, sort=False)
-        ]
+        parts = [one(group) for _, group in traj.groupby(by, sort=False)]
         return pd.concat(parts) if parts else traj.iloc[:0]
 
-    return traj.iloc[_select_frame(traj, epsilon, barriers, rules).mask].copy()
+    return one(traj).copy()

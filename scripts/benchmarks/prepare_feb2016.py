@@ -122,7 +122,8 @@ for var, circ in (("hs", False), ("dir", True)):
     st = st[st.t.between(epochs[k[sample]].min(), epochs[k[sample] + 1].max())]
     ref = annotate_points(st, a.x.to_numpy()[sample], a.y.to_numpy()[sample], t[sample],
                           spatial_method=IDW(k=K, power=POWER, circular=circ),
-                          temporal_method=DLT(circular=circ), circular=circ)
+                          temporal_method=DLT(circular=circ), circular=circ,
+                          filter_window=None)  # compared with an unfiltered reference
     mine = a[var].to_numpy()[sample]
     diff = np.abs(angular_residual(mine, ref)) if circ else np.abs(mine - ref)
     print(f"check {var}: max |vectorised - annotate_points| over 300 points = {np.nanmax(diff):.2e}")
