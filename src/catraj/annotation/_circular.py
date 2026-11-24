@@ -54,17 +54,24 @@ def angular_residual(predicted, observed):
     return (diff + 180.0) % 360.0 - 180.0
 
 
-def decode_compass(codes, step=COMPASS_STEP):
+def decode_compass(codes, step=COMPASS_STEP, north=1):
     """Decode compass-point codes to degrees.
 
     Direction is often recorded as a code on a 16-point rose rather than in
-    degrees, where ``degrees = code * 22.5``.  Interpolating the codes is
-    meaningless -- they are categorical labels, and a step from code 5 to code
-    13 is not a rotation -- so they must be decoded first.
+    degrees.  Interpolating the codes is meaningless -- they are categorical
+    labels, and a step from code 5 to code 13 is not a rotation -- so they must
+    be decoded first.
 
-    Values that land beyond a full turn are off the rose and are returned as
-    NaN; an exact 360 normalises to 0.
+    ``degrees = (code - north) * step``.  The default is the table of the
+    Zenodo archive (``E2_Weather_Conditions/table_windDirection.csv``, record
+    1167595): codes 1 to 16 are N, NNE, ..., NNW, from 0 to 337.5 degrees, so
+    code 1 is north; 17 is "calm", 18 "variable" and 19 "no data".  Those are
+    not directions.  Pass ``north=0`` for a rose whose first code is 0.
+
+    A code outside ``north .. north + 360 / step - 1`` is off the rose and is
+    returned as NaN, as is a missing code.
     """
-    deg = np.asarray(codes, dtype=float) * step
-    deg = np.where(deg > 360.0, np.nan, deg)
-    return np.mod(deg, 360.0)
+    code = np.asarray(codes, dtype=float)
+    last = north + round(360.0 / step) - 1
+    on_rose = (code >= north) & (code <= last)
+    return np.where(on_rose, (code - north) * step, np.nan)

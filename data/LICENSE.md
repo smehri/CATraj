@@ -50,6 +50,13 @@ Coastal weather observations.
 | Full dataset | ~75,000 hourly observations, 2015-10-01 to 2016-03-31 UTC |
 | Extract here | 400 observations, 2016-02-05 01:00 to 2016-02-06 01:00 UTC |
 
+`Weather_Observation_UTM.shp` keeps the archive's wind-direction code
+(`id_windDir`). `weather_observations.csv` is a longer, decoded table
+(71,134 rows, from the archive's `table_wheatherObservation.csv`): `Wind_Dir`
+is in degrees, `(code - 1) * 22.5` from the archive's `table_windDirection.csv`,
+and the archive's missing value (-65536) and the codes that are not directions
+(17 calm, 18 variable, 19 no data) are written as empty fields.
+
 ---
 
 ## Coastline — `sample/Coastline/`

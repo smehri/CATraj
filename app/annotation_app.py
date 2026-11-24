@@ -120,6 +120,10 @@ def _read(path):
             f"{Path(path).name} has no CRS. Interpolation weights distances, so "
             "the data needs a projected CRS in metres."
         )
+    # The Zenodo archive writes a missing measurement as -65536 (its
+    # README_parameters.txt); as data it would be interpolated like any value.
+    numeric = [c for c in _numeric_columns(gdf) if c != "geometry"]
+    gdf[numeric] = gdf[numeric].replace(-65536, np.nan)
     return gdf
 
 
@@ -334,7 +338,7 @@ value_cols = pn.widgets.MultiChoice(
 circular_cols = pn.widgets.MultiChoice(
     name="Which of those are bearings", options=[], value=[])
 decode_cols = pn.widgets.MultiChoice(
-    name="Which are compass-point codes (degrees = code x 22.5)",
+    name="Which are compass-point codes (code 1 = north, 22.5 degrees each)",
     options=[], value=[])
 
 data_status = pn.Column(_status("No data loaded yet."))

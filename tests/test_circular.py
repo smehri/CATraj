@@ -32,7 +32,21 @@ def test_angular_residual_takes_short_arc(pred, obs, expected):
 
 
 def test_decode_compass():
-    out = decode_compass([0, 4, 8, 16, 17])
+    out = decode_compass([1, 5, 9, 16, 17])
     assert COMPASS_STEP == 22.5
-    assert out[:4] == pytest.approx([0.0, 90.0, 180.0, 0.0])  # 16 -> 360 -> 0
-    assert np.isnan(out[4])  # off the rose
+    assert out[:4] == pytest.approx([0.0, 90.0, 180.0, 337.5])  # 1 is north
+    assert np.isnan(out[4])  # 17: calm, not a direction
+
+
+def test_decode_compass_follows_the_archive_table():
+    codes = np.arange(0, 21, dtype=float)
+    out = decode_compass(codes)
+    assert np.isnan(out[0]) and np.isnan(out[17:]).all()  # 0, calm, variable, no data
+    assert out[1:17] == pytest.approx((codes[1:17] - 1) * 22.5)
+    assert np.isnan(decode_compass([np.nan])[0])
+
+
+def test_decode_compass_can_start_at_zero():
+    out = decode_compass([0, 4, 8, 15, 16], north=0)
+    assert out[:4] == pytest.approx([0.0, 90.0, 180.0, 337.5])
+    assert np.isnan(out[4])
