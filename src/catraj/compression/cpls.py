@@ -203,6 +203,7 @@ import shapely
 
 from .._crs import _check_crs
 from ..preprocessing.filtering import denoise
+from .._parallel import map_groups, parallel_map
 from .douglas_peucker import douglas_peucker
 
 __all__ = [
@@ -220,6 +221,8 @@ _ROUNDING = 1e-9
 _CELL_BITS = 1 << np.arange(9)
 # Segments tested for self-intersection pairs at a time.
 _PAIR_BLOCK = 4096
+# Candidate pairs aimed at per block (bounding boxes that meet).
+_PAIR_TARGET = 2_000_000
 
 
 def _segments(x0, y0, x1, y1):
@@ -296,6 +299,17 @@ class Barriers:
 
     def __len__(self):
         return int(self._parts.size)
+
+    # Pickled for worker processes (catraj._parallel): the parts travel, the
+    # index and the prepared geometries are rebuilt on arrival.
+    def __getstate__(self):
+        return {"crs": self.crs, "parts": self._parts}
+
+    def __setstate__(self, state):
+        self.crs = state["crs"]
+        self._parts = state["parts"]
+        shapely.prepare(self._parts)
+        self._tree = shapely.STRtree(self._parts)
 
     def hits(self, x0, y0, x1, y1):
         """Whether each segment ``(x0, y0)--(x1, y1)`` intersects a barrier.
@@ -550,10 +564,17 @@ class _Stage2:
             # first: candidates by bounding box, then the exact test, a block
             # of segments at a time so that a tangle of GPS jitter cannot
             # exhaust memory.
+            # The block adapts to the density: in a tangle every segment's box
+            # meets most others, so it shrinks until a block yields about
+            # _PAIR_TARGET candidates (a few hundred MB), and grows again in
+            # open water.  The pairs found, and their order, do not depend on it.
             found = []
-            for lo in range(0, self.n - 1, _PAIR_BLOCK):
-                block = np.arange(lo, min(lo + _PAIR_BLOCK, self.n - 1))
+            lo, size = 0, 64                    # small at first: the track may start in a tangle
+            while lo < self.n - 1:
+                block = np.arange(lo, min(lo + size, self.n - 1))
+                lo += block.size
                 bi, j = self.segment_tree.query(self.segments[block])
+                size = int(np.clip(block.size * _PAIR_TARGET / max(bi.size, 1), 1, _PAIR_BLOCK))
                 i = block[bi]
                 off = i != j
                 i, j = i[off], j[off]
@@ -906,7 +927,7 @@ def _select_frame(df, epsilon, barriers, rules):
 
 def cpls_compress(
     traj, epsilon, barriers, by=None, *, filter_window=30, time_column=None,
-    **rules,
+    n_jobs=1, **rules,
 ):
     """Compress trajectories with CPLS.
 
@@ -935,6 +956,11 @@ def cpls_compress(
         Numeric time column (UNIX seconds) for the filter; the index
         otherwise, which must then be a DatetimeIndex (as MovingPandas keeps
         it).  Unused when ``filter_window`` is ``None``.
+    n_jobs : int or None
+        Processes over which the trajectories are shared out: ``1`` (the
+        default) for none, ``-1`` for every logical CPU.  Each trajectory is
+        still compressed on its own, so the result is the same.  See
+        :func:`catraj.parallel_map`.
     **rules
         ``topology``, ``direction``, ``avoid_self_intersection``,
         ``keep_self_intersection``, ``inversion``: switch a relation of the
@@ -958,11 +984,12 @@ def cpls_compress(
     if hasattr(traj, "trajectories"):  # TrajectoryCollection
         import movingpandas as mpd
 
-        return mpd.TrajectoryCollection([
-            cpls_compress(tr, epsilon, barriers, filter_window=filter_window,
-                          time_column=time_column, **rules)
-            for tr in traj.trajectories
-        ])
+        def again(tr):
+            return cpls_compress(tr, epsilon, barriers, filter_window=filter_window,
+                                 time_column=time_column, **rules)
+
+        return mpd.TrajectoryCollection(parallel_map(
+            again, traj.trajectories, n_jobs, [len(tr.df) for tr in traj.trajectories]))
 
     if hasattr(traj, "df") and hasattr(traj, "id"):  # Trajectory
         import movingpandas as mpd
@@ -970,7 +997,7 @@ def cpls_compress(
         return mpd.Trajectory(one(traj.df).copy(), traj.id)
 
     if by is not None:
-        parts = [one(group) for _, group in traj.groupby(by, sort=False)]
+        parts = map_groups(one, traj, by, n_jobs)
         return pd.concat(parts) if parts else traj.iloc[:0]
 
     return one(traj).copy()

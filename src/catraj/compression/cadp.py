@@ -111,6 +111,7 @@ from .._time import times_of
 from .._crs import _check_geographic
 from ..annotation._circular import angular_residual
 from ..preprocessing.filtering import denoise
+from .._parallel import map_groups, parallel_map
 from .douglas_peucker import douglas_peucker
 
 __all__ = [
@@ -424,6 +425,7 @@ def compress(
     by=None,
     mode="post",
     filter_window=30,
+    n_jobs=1,
 ):
     """Compress trajectories with CADP.
 
@@ -459,6 +461,11 @@ def compress(
         Width, in seconds (the unit of the times), of the time-windowed median
         applied before selection: ``30`` by default, ``None`` for no
         filtering.  See "Filtering first" in the module docstring.
+    n_jobs : int or None
+        Processes over which the trajectories are shared out: ``1`` (the
+        default) for none, ``-1`` for every logical CPU.  Each trajectory is
+        still compressed on its own, so the result is the same.  See
+        :func:`catraj.parallel_map`.
 
     Returns
     -------
@@ -483,11 +490,12 @@ def compress(
     if hasattr(traj, "trajectories"):  # TrajectoryCollection
         import movingpandas as mpd
 
-        return mpd.TrajectoryCollection([
-            compress(tr, epsilon, thresholds, circular, nominal, time_column,
-                     mode=mode, filter_window=filter_window)
-            for tr in traj.trajectories
-        ])
+        def again(tr):
+            return compress(tr, epsilon, thresholds, circular, nominal, time_column,
+                            mode=mode, filter_window=filter_window)
+
+        return mpd.TrajectoryCollection(parallel_map(
+            again, traj.trajectories, n_jobs, [len(tr.df) for tr in traj.trajectories]))
 
     if hasattr(traj, "df") and hasattr(traj, "id"):  # Trajectory
         import movingpandas as mpd
@@ -495,7 +503,7 @@ def compress(
         return mpd.Trajectory(one(traj.df).copy(), traj.id)
 
     if by is not None:
-        parts = [one(group) for _, group in traj.groupby(by, sort=False)]
+        parts = map_groups(one, traj, by, n_jobs)
         return pd.concat(parts) if parts else traj.iloc[:0]
 
     return one(traj).copy()

@@ -196,6 +196,7 @@ from .cpls import (
     _Stage2,
 )
 from ..preprocessing.filtering import denoise, rolling_filter
+from .._parallel import map_groups, parallel_map
 from .douglas_peucker import douglas_peucker
 
 __all__ = [
@@ -530,7 +531,8 @@ def _result_frame(df, sel, stay_column):
 def two_stage_cpls_compress(
     traj, epsilon, speed_epsilon, barriers, *, time_column=None, by=None,
     status_column=None, stay_status=(1, 5), stay_radius=None,
-    stay_duration=None, stay_column="stay", filter_window=30, **rules,
+    stay_duration=None, stay_column="stay", filter_window=30, n_jobs=1,
+    **rules,
 ):
     """Compress trajectories with 2stage-CPLS.
 
@@ -566,6 +568,11 @@ def two_stage_cpls_compress(
         denoised, the speed series is computed from the filtered positions
         and filtered again with the same window (P2 of the module docstring).
         The result's geometry is the filtered one.
+    n_jobs : int or None
+        Processes over which the trajectories are shared out: ``1`` (the
+        default) for none, ``-1`` for every logical CPU.  Each trajectory is
+        still compressed on its own, so the result is the same.  See
+        :func:`catraj.parallel_map`.
     **rules
         The five CPLS switches, as in :func:`.cpls_compress`.
 
@@ -598,7 +605,8 @@ def two_stage_cpls_compress(
     if hasattr(traj, "trajectories"):  # TrajectoryCollection
         import movingpandas as mpd
 
-        return mpd.TrajectoryCollection([again(tr) for tr in traj.trajectories])
+        return mpd.TrajectoryCollection(parallel_map(
+            again, traj.trajectories, n_jobs, [len(tr.df) for tr in traj.trajectories]))
 
     if hasattr(traj, "df") and hasattr(traj, "id"):  # Trajectory
         import movingpandas as mpd
@@ -606,7 +614,7 @@ def two_stage_cpls_compress(
         return mpd.Trajectory(one(traj.df), traj.id)
 
     if by is not None:
-        parts = [one(group) for _, group in traj.groupby(by, sort=False)]
+        parts = map_groups(one, traj, by, n_jobs)
         return pd.concat(parts) if parts else traj.iloc[:0]
 
     return one(traj)

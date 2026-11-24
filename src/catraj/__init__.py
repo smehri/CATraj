@@ -17,5 +17,6 @@ import os as _os
 _os.environ.setdefault("MKL_THREADING_LAYER", "SEQUENTIAL")
 
 from . import annotation, compression, preprocessing
+from ._parallel import parallel_map
 
-__all__ = ["annotation", "compression", "preprocessing", "__version__"]
+__all__ = ["annotation", "compression", "preprocessing", "parallel_map", "__version__"]
