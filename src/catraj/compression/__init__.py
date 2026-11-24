@@ -21,6 +21,23 @@ inversion at a shared vertex.  The barriers are shapely geometries, indexed
 once by :class:`.Barriers`.  The track's own relations keep many points on raw
 AIS with moored vessels; the paper's two-stage variant is meant to remove that.
 
+:mod:`.two_stage` implements 2stage-CPLS (Algorithm 2 of the same paper): stay
+points -- by AIS status or by Li et al.'s stay-point detection -- are replaced
+by their centroid, Douglas--Peucker on the speed series marks where the vessel
+changes speed, and CPLS then runs on the collapsed track with those points
+forced.  The topological signature is that of the collapsed trajectory, so the
+jitter of a moored vessel no longer keeps its points.
+
+Every dataframe-level step -- :func:`compress`, :func:`cpls_compress` and
+:func:`two_stage_cpls_compress` -- first median-filters its inputs over a
+30-second window (``filter_window=30``; ``None`` switches it off), with
+:func:`catraj.preprocessing.denoise`: the positions, and for CADP every numeric
+threshold column; the result rows carry the filtered values.
+:func:`two_stage_cpls_select` also filters its speed series (``speed_window``).
+The array-level algorithms (``douglas_peucker``, ``cadp_select``,
+``cpls_select``) filter nothing.  Time comes from ``time_column`` or a
+DatetimeIndex.
+
 :mod:`.evaluation` scores a compression by its ratio and by DTW similarity.
 
 Each module's docstring carries the part of the method it implements, and the
@@ -44,11 +61,19 @@ from .cpls import (
 )
 from .douglas_peucker import douglas_peucker, segment_distances
 from .evaluation import compression_ratio, dtw
+from .two_stage import (
+    TwoStageSelection,
+    stay_points,
+    two_stage_cpls_compress,
+    two_stage_cpls_select,
+)
 
 __all__ = [
     "compress", "cadp_select", "Context", "Selection",
     "context_errors", "nominal_boundaries",
     "Barriers", "CplsSelection", "segment_crossings", "cpls_select", "cpls_compress",
+    "TwoStageSelection", "stay_points", "two_stage_cpls_select",
+    "two_stage_cpls_compress",
     "douglas_peucker", "segment_distances",
     "compression_ratio", "dtw",
 ]
