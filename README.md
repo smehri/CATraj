@@ -13,9 +13,9 @@ The algorithms apply to **any moving object** — vessels, aircraft, vehicles,
 wildlife, pedestrians. The maritime data in the examples is one application,
 not the scope.
 
-**This release implements trajectory annotation, CADP compression and CPLS
-compression.** The other compression and prediction algorithms below are being
-added in later releases.
+**This release implements trajectory annotation, CADP compression, CPLS
+compression and 2stage-CPLS compression.** The prediction algorithm below is
+being added in a later release.
 
 ---
 
@@ -26,7 +26,7 @@ added in later releases.
 | **Annotation** | Attaches context observed at coarse resolution to high-frequency trajectory points. Spatial interpolation across observation stations, then temporal interpolation through time. | 2023 | **implemented** |
 | **CADP** | Context-Aware Douglas–Peucker. Extends DP with three context domains — environmental, internal, semantic — retaining points that carry contextual information a purely spatial criterion would discard. | 2025 | **implemented** |
 | **CPLS** | Context-aware Piecewise Linear Segmentation. Guarantees logical consistency, e.g., a compressed (simplified) vessel trajectory may not cross the shoreline, and keeps its topological signature (barriers, direction, self-intersections). | 2021 | **implemented** |
-| **2stage-CPLS** | CPLS plus stay-point preservation. | 2021 | planned |
+| **2stage-CPLS** | CPLS plus stay-point preservation. | 2021 | **implemented** |
 | **CLSTM** | Context-aware LSTM. Routes each trajectory to a per-type network, avoiding Simpson's paradox in a single global model. | 2021, 2023 | planned |
 
 ---
@@ -49,7 +49,7 @@ publisher via the DOI. The implementation does not depend on having them.
 
 | folder | what it holds |
 |---|---|
-| [`src/catraj/`](src/catraj/) | the library: `annotation`, `compression` |
+| [`src/catraj/`](src/catraj/) | the library: `annotation`, `preprocessing`, `compression` |
 | [`tests/`](tests/) | the test suite (`pytest`) |
 | [`notebooks/`](notebooks/) | the tutorials, in reading order |
 | [`scripts/`](scripts/) | command-line scripts: the data downloader, whole-archive workflows, and `benchmarks/` (temporary research scripts, to be removed) |
@@ -120,11 +120,45 @@ Millions of positions are fine: long inputs are processed in time blocks
 (`chunk_epochs`), DLT is evaluated for all positions at once, and `n_jobs=-1`
 spreads the blocks over every core (as it spreads epochs in
 `evaluate_spatial`). The whole six-month sample archive, 18 million positions,
-annotates in under half a minute per variable on 32 cores.
+annotates in under a minute per variable on 32 cores (about 26 s for a linear
+variable, 49 s for a bearing).
 
 Context attaches as ordinary columns, so it survives the `.iloc` slicing that
 trajectory compression performs — a compressed trajectory keeps the context of
 the points it retains.
+
+**Every processing step median-filters its inputs by default, over a 30 second
+window; pass `filter_window=None` to turn it off.** Raw AIS positions are
+noisy, so `annotate_points` filters each station's observation series,
+`compress`, `cpls_compress` and `two_stage_cpls_compress` filter the positions
+(CADP also its threshold columns, 2stage-CPLS also its speed series), and the
+compressed rows carry the filtered values. Time comes from `time_column` or a
+DatetimeIndex (MovingPandas); a plain numeric index without `time_column` is
+refused rather than filtered by row number. The array-level functions
+(`douglas_peucker`, `cadp_select`, `cpls_select`) filter nothing. The tutorials run
+the algorithms unfiltered, with `filter_window=None`, and show the default result next
+to it.
+
+`denoise` is the same step on its own, for another window, the mean (as in the
+paper) instead of the median, or one pass shared by several steps. It replaces
+each point by the median of the points within a centred time window, for the
+positions and any columns you name (bearings in `circular`, filtered through
+their unit vector); rows, index and columns are unchanged:
+
+```python
+from catraj.preprocessing import denoise
+
+clean = denoise(traj, window=60, columns=["speed_over_ground"],
+                time_column="unix_time", by="mmsi")   # seconds; 30 by default
+```
+
+On the 24-hour sample it takes about 0.25 s, moves the median point by 0.0 m
+(95th percentile 22 m) at 30 s, and creates no land crossing that the raw track
+did not have there. Filtering the positions alone raises the number of points
+2stage-CPLS keeps (5,228 raw, 12,006 after a 30 s median) because filtered
+positions repeat; filtering its speed series too, as it does by default, brings
+it to 4,759. `help(catraj.preprocessing.filtering)` has the table and the
+decisions. Hourly station series are unchanged by a 30 s window.
 
 Compression then uses those columns. CADP runs Douglas–Peucker, then adds back
 every point whose removal would misrepresent a context variable by more than
@@ -137,7 +171,7 @@ small = compress(
     traj, epsilon=1_000,                          # metres, for Douglas–Peucker
     thresholds={"wind_speed": 0.5, "speed_over_ground": 1.0},
     time_column="unix_time", by="mmsi",           # or pass a movingpandas Trajectory
-)
+)                                                 # filtered first: filter_window=30
 compression_ratio(len(small), len(traj)), dtw(traj, small)
 ```
 
@@ -162,7 +196,8 @@ projected CRS as the positions:
 from catraj.compression import cpls_compress
 
 land = gpd.read_file("data/sample/Coastline/Coastline_UTM.shp")   # land polygons
-safe = cpls_compress(traj, epsilon=1_000, barriers=land, by="mmsi")
+safe = cpls_compress(traj, epsilon=1_000, barriers=land, by="mmsi",
+                     time_column="unix_time")
 ```
 
 The result is always a superset of the Douglas–Peucker result, introduces no
@@ -174,15 +209,44 @@ The self-intersection and inversion relations act on the track alone, and on
 raw AIS they are expensive: the GPS jitter of a moored vessel crosses itself
 thousands of times, and keeping those crossings keeps most of its points. On
 the 24-hour sample at 1 km, the barrier relations alone keep 607 of 106,894
-points, all five 43,074 (about 40 s instead of 3 s). The paper's two-stage
-CPLS, not implemented yet, collapses stay points first and removes that
-jitter. Until then, switch relations off by keyword:
+points, all five 43,074 (about 40 s instead of 3 s), without filtering; with
+the default 30 s filter, 604 and 35,020. The paper's two-stage
+CPLS collapses stay points first and removes that jitter (below). Otherwise,
+switch relations off by keyword:
 
 ```python
 safe = cpls_compress(traj, epsilon=1_000, barriers=land, by="mmsi",
-                     keep_self_intersection=False, avoid_self_intersection=False,
+                     time_column="unix_time", keep_self_intersection=False, avoid_self_intersection=False,
                      inversion=False)          # barrier relations only
 ```
+
+2stage-CPLS is that two-stage variant. A stay (a vessel at anchor, found by
+its AIS status, by Li et al.'s stay-point detection, or both) becomes two
+vertices at its centroid, keeping the duration of the stop; Douglas–Peucker on
+the speed series keeps the points where the speed changes; and CPLS then runs
+on the collapsed track, so its topological signature is that of the track
+with each stay replaced by its centroid. Time is read like CADP does, from the
+index or `time_column`; the paper gives no stay thresholds, so none is assumed:
+
+```python
+from catraj.compression import two_stage_cpls_compress
+
+small = two_stage_cpls_compress(
+    traj, epsilon=1_000, speed_epsilon=1.54,      # metres; metres per second (3 knots)
+    barriers=land, time_column="unix_time", by="mmsi",
+    status_column="navigation",                   # status 1 and 5: at anchor, moored
+    stay_radius=100, stay_duration=600,           # and 10 minutes within 100 m
+)
+```
+
+The result is a row subset of the input, except that the geometry of each
+stay's two kept rows is the centroid; a `stay` column marks them. On the
+24-hour sample (epsilon 1 km, 1.54 m/s, all five relations) status alone finds
+19 stays and keeps 44,369 of 106,894 points, hardly fewer than CPLS, because
+most moored vessels there do not report "at anchor"; adding movement detection
+(100 m, 10 minutes: 98 stays) keeps 5,228 unfiltered (`filter_window=None`) and
+4,759 with the default filter, in about 10 s.
+`help(catraj.compression.two_stage)` lists the decisions behind it.
 
 There is also an interactive app, which compares interpolation methods by
 cross-validation before annotating:
