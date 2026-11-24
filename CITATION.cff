@@ -14,7 +14,8 @@ abstract: >-
   context, and Context-aware Piecewise Linear Segmentation (CPLS) compression,
   which keeps the points whose removal would change the trajectory's
   topological signature: a crossing of a barrier such as a shoreline, passing
-  it on the other side, or a changed self-intersection.
+  it on the other side, or a changed self-intersection. Two-stage CPLS adds
+  stay-point preservation to CPLS.
 type: software
 authors:
   - family-names: Mehri
@@ -80,7 +81,7 @@ references:
     end: 45613
     year: 2021
     doi: 10.1109/ACCESS.2021.3066463
-    notes: "CPLS trajectory compression, implemented in catraj.compression. Two-stage CPLS and CLSTM are planned for a future release."
+    notes: "CPLS and two-stage CPLS trajectory compression, implemented in catraj.compression. CLSTM is planned for a future release."
 
   - type: software
     title: "MovingPandas: Efficient Structures for Movement Data in Python"
