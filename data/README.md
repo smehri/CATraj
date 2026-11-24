@@ -17,7 +17,8 @@ data/
 │   ├── P1_AIS_Codes/               # Ship Types List.csv, MMSI Country Codes.csv, ...
 │   ├── E1_ocean/                   # oc_february.csv (sea state), README_parameters.txt
 │   ├── E2_Weather_Conditions/      # weather observations and stations
-│   └── C2_European_Coastline/      # Europe Coastline (Polygone).shp (+ sidecars): the full EEA coastline
+│   ├── C2_European_Coastline/      # Europe Coastline (Polygone).shp (+ sidecars): the full EEA coastline
+│   └── clean/                      # scripts/prepare_zenodo.py: ais_dynamic, ocean_<month>, weather (.parquet)
 └── cache/                          # not committed: intermediate files the code builds; safe to delete
     └── cadp_feb2016.pkl            # written by scripts/benchmarks/prepare_feb2016.py
 ```
@@ -40,14 +41,22 @@ To fill it, run this from the repository root:
 python scripts/download_data.py          # or: annotation | cadp | cpls | --check
 ```
 
+Then clean it (descriptive column names, "not available" codes as NaN, noise
+removed with a median filter), which writes `zenodo_1167595/clean/`:
+
+```bash
+python scripts/prepare_zenodo.py         # needs pyarrow; --force rebuilds, --window sets seconds
+```
+
 You can also set `DOWNLOAD = True` in a notebook's settings cell, or download
 by hand. All three ways are explained step by step in
 [`docs/getting_the_data.md`](../docs/getting_the_data.md).
 
 | used by | needs |
 |---|---|
-| `notebooks/01_trajectory_annotation.ipynb` (`SOURCE = "zenodo"`) | `P1_AIS_Data`, `P1_AIS_Codes`, `E2_Weather_Conditions` |
-| `notebooks/02_cadp_compression.ipynb` | `P1_AIS_Data`, `E1_ocean` |
+| `scripts/prepare_zenodo.py` | `P1_AIS_Data`, `P1_AIS_Codes`, `E1_ocean`, `E2_Weather_Conditions` (writes `clean/`) |
+| `notebooks/01_trajectory_annotation.ipynb` (`SOURCE = "zenodo"`) | `clean/ais_dynamic.parquet`, `clean/weather.parquet`, the README files in `P1_AIS_Data`, `E2_Weather_Conditions` |
+| `notebooks/02_cadp_compression.ipynb` | `clean/ais_dynamic.parquet`, `clean/ocean_february.parquet` |
 | `notebooks/03_cpls_compression.ipynb` (optional last section) | `C2_European_Coastline` |
 | `scripts/benchmarks/` | `P1_AIS_Data`, `E1_ocean` |
 

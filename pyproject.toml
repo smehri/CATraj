@@ -51,8 +51,10 @@ dependencies = [
 app = ["panel>=1.3", "hvplot>=0.9", "holoviews>=1.18", "bokeh>=3.3", "geoviews>=1.11"]
 # Writing context onto movingpandas.Trajectory objects.
 movingpandas = ["movingpandas>=0.17"]
+# Reading and writing the cleaned Zenodo data (scripts/prepare_zenodo.py).
+data = ["pyarrow>=14"]
 test = ["pytest>=7"]
-dev = ["catraj[app,movingpandas,test]", "black", "ruff"]
+dev = ["catraj[app,movingpandas,test,data]", "black", "ruff"]
 
 [project.urls]
 Repository = "https://github.com/smehri/catraj"

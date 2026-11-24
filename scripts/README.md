@@ -6,6 +6,7 @@ with the package installed (`pip install -e .`, see the main README).
 | script | what it does |
 |---|---|
 | `download_data.py` | downloads the public Zenodo archive (AIS, weather, sea state, coastline) into `data/zenodo_1167595/`, verifying checksums ([`docs/getting_the_data.md`](../docs/getting_the_data.md)) |
+| `prepare_zenodo.py` | run after the download: renames the archive's coded columns, sets "not available" codes to NaN, median-filters the columns the notebooks use, writes `data/zenodo_1167595/clean/*.parquet` (needs `pyarrow`) |
 | `cadp_on_annotated_fleet.py` | runs CADP over the whole annotated fleet (below) |
 | [`benchmarks/`](benchmarks/) | temporary research scripts behind the CADP paper's experiments, to be removed |
 
@@ -21,6 +22,7 @@ methods; this applies them at scale.
 
 ```bash
 python scripts/download_data.py annotation     # once: the Zenodo archive (~203 MB)
+python scripts/prepare_zenodo.py               # once: cleaned Parquet files for the notebooks
 # run notebooks/01_trajectory_annotation.ipynb with the full archive and EXPORT_FLEET = True
 python scripts/cadp_on_annotated_fleet.py
 ```

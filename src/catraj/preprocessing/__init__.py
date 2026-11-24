@@ -19,5 +19,6 @@ several steps.
 """
 
 from .filtering import denoise, rolling_filter
+from .mmsi import ITU_MIDS, mmsi_class, mmsi_classes
 
-__all__ = ["denoise", "rolling_filter"]
+__all__ = ["denoise", "rolling_filter", "ITU_MIDS", "mmsi_class", "mmsi_classes"]
