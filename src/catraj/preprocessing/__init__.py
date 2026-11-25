@@ -25,9 +25,12 @@ several steps.
 from . import archive
 from .archive import *  # noqa: F401,F403
 from .archive import __all__ as _archive_all
+from .datasets_spec import DATASETS, get_dataset
 from .filtering import denoise, rolling_filter
+from .marinecadastre import grid_bearing, preprocess_us
 from .mmsi import ITU_MIDS, mmsi_class, mmsi_classes
 from .trips import split_trips, trip_ids
 
 __all__ = ["denoise", "rolling_filter", "ITU_MIDS", "mmsi_class", "mmsi_classes",
-           "split_trips", "trip_ids", "archive", *_archive_all]
+           "split_trips", "trip_ids", "archive", "marinecadastre", "grid_bearing",
+           "preprocess_us", "DATASETS", "get_dataset", *_archive_all]

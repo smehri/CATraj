@@ -1,0 +1,27 @@
+dataset,step,rule,rows_in,rows_out,rows_dropped,values_to_nan
+AIS 2017-11,read_ais_raw,rows read,465852,465852,0,0
+AIS 2017-11,read_ais_raw,position inside the study area,465852,465852,0,0
+AIS 2017-11,read_ais_raw,"information only, kept: of these, lat > 44.5 and lon < -73 (St. Lawrence, Lake Champlain)",0,0,0,0
+AIS 2017-11,drop_invalid_mmsi,mmsi: ship station kept,465852,465798,54,0
+AIS 2017-11,drop_invalid_mmsi,mmsi: craft of a parent ship,54,0,54,0
+AIS 2017-11,drop_invalid_time,unix_time inside the archive period,465798,465798,0,0
+AIS 2017-11,drop_invalid_position,"lon, lat in valid range",465798,465798,0,0
+AIS 2017-11,unavailable_to_nan,speed_over_ground >= 102.3 (n/a),465798,465798,0,0
+AIS 2017-11,unavailable_to_nan,course_over_ground >= 360 (n/a),465798,465798,0,0
+AIS 2017-11,unavailable_to_nan,true_heading >= 360 (511 n/a),465798,465798,0,0
+AIS 2017-11,unavailable_to_nan,rate_of_turn == -128 (n/a),465798,465798,0,0
+AIS 2017-11,check_ranges,speed_over_ground outside 0..<102.3,465798,465798,0,0
+AIS 2017-11,check_ranges,course_over_ground outside 0..<360,465798,465798,0,0
+AIS 2017-11,check_ranges,true_heading outside 0..<360,465798,465798,0,0
+AIS 2017-11,check_ranges,rate_of_turn outside -127..127,465798,465798,0,0
+AIS 2017-11,check_ranges,navigational_status not a code 0..15,465798,465798,0,0
+AIS 2017-11,check_ranges,length outside 0..1022,465798,465798,0,0
+AIS 2017-11,check_ranges,width outside 0..126,465798,465798,0,0
+AIS 2017-11,drop_duplicates_and_sort,"duplicate (mmsi, unix_time)",465798,465796,2,0
+AIS 2017-11,attach_vessel_types,Unknown / Other: vessel without a ship-type code,465796,465796,0,234171
+AIS 2017-11,drop_position_jumps,isolated jump above 50 knots,465796,465795,1,0
+AIS 2017-11,denoise_ais,"median filter, 30 s window; x, y; grid bearings",465795,465795,0,0
+coastline,read_coastline,lines touching the area,550,550,0,0
+coastline,read_coastline,"regions N,M,S,GS,SG,MN,NM",550,550,0,0
+coastline,project_coastline,to EPSG:32618,550,550,0,0
+coastline,clip_coastline,clipped to the area + 0.5 degrees,550,550,0,0
