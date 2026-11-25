@@ -1,15 +1,23 @@
+import subprocess
+import sys
+from functools import lru_cache
+
 import geopandas as gpd
 import numpy as np
 import pandas as pd
 import pytest
 
+from catraj.compression import two_stage_cpls_compress
 from catraj.prediction.clstm import (
+    ClstmPredictor,
     PredictionSamples,
     make_samples,
     prediction_errors,
     split_by_trajectory,
 )
 from catraj.prediction.curvilinear import KNOT, curvilinear_predict
+
+from helpers import DATASETS
 
 
 # ------------------------------------------------------------- fixtures
@@ -387,3 +395,221 @@ def test_prediction_errors_scores_the_physical_model_alone():
 def test_prediction_errors_rejects_wrong_shape():
     with pytest.raises(ValueError, match="shape"):
         prediction_errors(np.zeros((3, 3, 2)), _scoring_samples())
+
+
+# ------------------------------------------------------------- the networks
+#
+# The synthetic fleet of section IV-E's argument: three types whose actual
+# motion departs from dead reckoning in their own way.
+
+_DRIFT = {"A": (100.0, 0.0), "B": (0.0, 100.0), "C": (0.0, 0.0)}
+
+
+@lru_cache(maxsize=1)
+def _synthetic_fleet():
+    """60 trajectories, 20 per type.  Rows carry the SOG and COG of dead
+    reckoning; the actual track adds the type's drift at every step."""
+    rng = np.random.default_rng(11)
+    frames = []
+    for i in range(60):
+        kind = "ABC"[i % 3]
+        n, dt = 40, 5.0
+        speed = rng.uniform(3.0, 8.0)  # m/s
+        course = rng.uniform(0.0, 360.0)
+        t = dt * np.arange(n)
+        step = speed * dt
+        sx, sy = np.sin(np.radians(course)), np.cos(np.radians(course))
+        k = np.arange(n)
+        x = 4e5 + rng.uniform(-1e3, 1e3) + k * (step * sx + _DRIFT[kind][0])
+        y = 5.3e6 + rng.uniform(-1e3, 1e3) + k * (step * sy + _DRIFT[kind][1])
+        frames.append(_frame(t, x, y, speed / KNOT, course,
+                             vessel_type=kind, ident=f"v{i}"))
+    samples = _make(pd.concat(frames), context_column="type", by="id")
+    return split_by_trajectory(samples, test_size=0.2, seed=0)
+
+
+def _predictor(**kw):
+    kw.setdefault("device", "cpu")
+    return ClstmPredictor(**kw)
+
+
+def _tiny_fit(**kw):
+    train, _ = _synthetic_fleet()
+    kw.setdefault("max_epochs", 3)
+    return _predictor(**kw).fit(train)
+
+
+@pytest.mark.torch
+def test_clstm_learns_each_types_deviation():
+    pytest.importorskip("torch")
+    # A batch of 32 instead of the default 256: this tiny fleet has about 600
+    # samples a group, so 256 gives 2-3 optimiser steps per epoch and the
+    # networks stop far short of convergence.  Real data has millions of
+    # samples.  Passes both margins on the 10 fleet seeds 11-20 measured.
+    train, test = _synthetic_fleet()
+    clstm = _predictor(max_epochs=300, batch_size=32).fit(train)
+    lstm = _predictor(context=False, max_epochs=300, batch_size=32).fit(train)
+    assert clstm.groups_ == ["A", "B", "C"] and clstm.dropped_groups_ == []
+    assert lstm.groups_ == ["all"]
+    errors = {
+        "curvilinear": prediction_errors(test.curvilinear, test),
+        "lstm": prediction_errors(lstm.predict(test), test),
+        "clstm": prediction_errors(clstm.predict(test), test),
+    }
+    mean = {k: v.loc["all", "mean_error"] for k, v in errors.items()}
+    print("mean point-wise error", mean)
+    assert mean["clstm"] < 0.3 * mean["curvilinear"]
+    assert mean["clstm"] < 0.5 * mean["lstm"]
+
+
+@pytest.mark.torch
+def test_fit_is_deterministic_on_cpu():
+    pytest.importorskip("torch")
+    _, test = _synthetic_fleet()
+    a, b = _tiny_fit(), _tiny_fit()
+    np.testing.assert_array_equal(a.predict(test), b.predict(test))
+    c = _tiny_fit(seed=1)
+    assert not np.array_equal(a.predict(test), c.predict(test))
+    assert a.history_ == b.history_
+
+
+@pytest.mark.torch
+def test_save_and_load_give_the_same_predictions(tmp_path):
+    pytest.importorskip("torch")
+    _, test = _synthetic_fleet()
+    fitted = _tiny_fit(min_samples=300)
+    path = tmp_path / "clstm.pt"
+    fitted.save(path)
+    loaded = ClstmPredictor.load(path, device="cpu")
+    np.testing.assert_array_equal(fitted.predict(test), loaded.predict(test))
+    assert loaded.groups_ == fitted.groups_
+    assert loaded.dropped_groups_ == fitted.dropped_groups_
+    assert loaded.history_ == fitted.history_
+    assert loaded.summary() == fitted.summary()
+    assert loaded.hidden_size == 64 and loaded.min_samples == 300
+
+
+@pytest.mark.torch
+def test_small_groups_get_no_network():
+    pytest.importorskip("torch")
+    train, test = _synthetic_fleet()
+    counts = {g: int((train.group == g).sum()) for g in "ABC"}
+    limit = max(counts.values()) + 1  # every group is dropped but none trains
+    assert _predictor(max_epochs=1, min_samples=limit).fit(train).groups_ == []
+
+    limit = sorted(counts.values())[1]  # drops the smallest group only
+    fitted = _predictor(max_epochs=2, min_samples=limit).fit(train)
+    dropped = sorted(g for g, c in counts.items() if c < limit)
+    assert dropped
+    assert fitted.dropped_groups_ == dropped
+    assert fitted.groups_ == sorted(set("ABC") - set(dropped))
+    pred = fitted.predict(test)
+    gone = np.isin(test.group, dropped)
+    assert gone.any() and np.isnan(pred[gone]).all()
+    assert np.isfinite(pred[~gone]).all()
+    table = prediction_errors(pred, test)
+    for g in dropped:
+        assert table.loc[g, "missing"] == (test.group == g).sum()
+        assert table.loc[g, "samples"] == 0
+    assert table.loc["all", "missing"] == gone.sum()
+    assert set(fitted.history_) == set(fitted.groups_)
+    for g in dropped:
+        assert g in fitted.summary().splitlines()[-1]
+
+
+@pytest.mark.torch
+def test_one_trajectory_trains_without_validation():
+    pytest.importorskip("torch")
+    train, _ = _synthetic_fleet()
+    one = train.subset(train.trajectory == train.trajectory[0])
+    fitted = _predictor(max_epochs=4, min_samples=10).fit(one)
+    (hist,) = fitted.history_.values()
+    assert len(hist) == 4 and all(np.isnan(h[2]) for h in hist)
+    assert "none" in fitted.summary()
+
+
+@pytest.mark.torch
+def test_early_stopping_restores_the_best_epoch():
+    pytest.importorskip("torch")
+    train, _ = _synthetic_fleet()
+    fitted = _predictor(max_epochs=60, patience=2, lr=0.05).fit(train)
+    stopped = 0
+    for hist in fitted.history_.values():
+        val = [h[2] for h in hist]
+        assert [h[0] for h in hist] == list(range(1, len(hist) + 1))
+        assert not np.isnan(val).any()
+        if len(hist) < 60:
+            stopped += 1
+            assert len(hist) - 1 - int(np.argmin(val)) == 2  # patience ran out
+        assert f"{min(val):.5f}" in fitted.summary()
+    assert stopped
+
+
+@pytest.mark.torch
+def test_predict_before_fit_raises(tmp_path):
+    pytest.importorskip("torch")
+    _, test = _synthetic_fleet()
+    with pytest.raises(RuntimeError, match="fit"):
+        _predictor().predict(test)
+    with pytest.raises(RuntimeError, match="fit"):
+        _predictor().save(tmp_path / "nowhere.pt")
+
+
+@pytest.mark.torch
+def test_predict_keeps_the_sample_shape_and_float64():
+    pytest.importorskip("torch")
+    _, test = _synthetic_fleet()
+    fitted = _tiny_fit()
+    pred = fitted.predict(test)
+    assert pred.shape == test.targets.shape and pred.dtype == np.float64
+    assert np.isfinite(pred).all()
+    assert fitted.predict(test.subset([])).shape == (0, 3, 2)
+
+
+def test_missing_torch_gives_install_hint(monkeypatch):
+    monkeypatch.setitem(sys.modules, "torch", None)
+    with pytest.raises(ImportError, match=r"catraj\[predict\]"):
+        ClstmPredictor()
+
+
+def test_import_does_not_need_torch():
+    code = (
+        "import sys; sys.modules['torch'] = None\n"
+        "import catraj, catraj.prediction as p\n"
+        "from catraj.prediction import ClstmPredictor\n"
+        "import numpy as np\n"
+        "p.curvilinear_predict(np.zeros(1), np.zeros(1), np.ones(1),"
+        " np.zeros(1), 1.0)\n"
+    )
+    done = subprocess.run([sys.executable, "-c", code], capture_output=True,
+                          text=True)
+    assert done.returncode == 0, done.stderr
+
+
+# -------------------------------------------------------------- sample data
+
+
+@pytest.mark.data
+@pytest.mark.torch
+def test_clstm_runs_on_the_sample_fleet():
+    pytest.importorskip("torch")
+    ais = gpd.read_file(DATASETS / "AIS" / "AIS_DLT_UTM.shp")
+    ais = ais.sort_values(["sourcemmsi", "t"], kind="stable")
+    land = gpd.read_file(DATASETS / "Coastline" / "Coastline_UTM.shp")
+    small = two_stage_cpls_compress(
+        ais, 1_000, 1.54, land, status_column="navigation", stay_radius=100,
+        stay_duration=600, time_column="t", by="sourcemmsi",
+    )
+    samples = make_samples(
+        small, speed_column="speedoverg", course_column="courseover",
+        context_column="vesselType", time_column="t", by="sourcemmsi",
+    )
+    train, test = split_by_trajectory(samples)
+    fitted = ClstmPredictor(max_epochs=3, min_samples=50, device="cpu").fit(train)
+    assert fitted.groups_ and fitted.dropped_groups_
+    pred = fitted.predict(test)
+    assert pred.shape == test.targets.shape
+    trained = np.isin(test.group, fitted.groups_)
+    assert trained.any() and np.isfinite(pred[trained]).all()
+    assert np.isnan(pred[~trained]).all()
+    assert prediction_errors(pred, test).loc["all", "samples"] == trained.sum()

@@ -69,6 +69,24 @@ Decided here
 * **H6. Determinism.**  ``seed`` seeds numpy and torch.  On CPU two fits with
   the same seed give identical predictions.
 
+Details of the networks (also decided here)
+-------------------------------------------
+
+* The scalers of H2 are computed on the network's training trajectories only
+  (the validation trajectories of H5 excluded); each input feature over all
+  samples and steps.  A zero standard deviation becomes 1.
+* Every network starts from the same seed, so a group's network does not depend
+  on the other groups.  Batches are drawn with a seeded ``torch.randperm``.
+* The training loss of an epoch is the mean over its samples; the validation
+  loss is the MSE on the standardised outputs of the held-out trajectories.
+  ``validation_size=0`` switches validation off.
+* ``context=False`` trains one network on every sample, whatever its group; it
+  is stored under the name ``"all"``.  A group met at ``predict`` time that has
+  no network gives NaN rows.
+* :meth:`ClstmPredictor.save` writes one ``torch.save`` file of plain types and
+  tensors only, so :meth:`ClstmPredictor.load` reads it with
+  ``weights_only=True``, on any device.
+
 Details of the sample builder (also decided here)
 -------------------------------------------------
 
@@ -100,6 +118,7 @@ References
 
 from __future__ import annotations
 
+import copy
 from dataclasses import dataclass
 
 import numpy as np
@@ -113,6 +132,7 @@ __all__ = [
     "PredictionSamples",
     "make_samples",
     "split_by_trajectory",
+    "ClstmPredictor",
     "prediction_errors",
 ]
 
@@ -416,3 +436,296 @@ def prediction_errors(predicted, samples):
     rows = {name: row(groups == name) for name in names}
     rows["all"] = row(np.ones(len(samples), dtype=bool))
     return pd.DataFrame.from_dict(rows, orient="index")[columns]
+
+
+# --------------------------------------------------------------- networks
+
+_INSTALL_HINT = (
+    "CLSTM needs PyTorch: pip install catraj[predict]  (for an NVIDIA GPU, "
+    "install the CUDA build of torch first, from https://pytorch.org)"
+)
+_PREDICT_BATCH = 65_536
+
+
+def _torch():
+    try:
+        import torch
+    except ImportError:
+        raise ImportError(_INSTALL_HINT) from None
+    return torch
+
+
+def _network(torch, hidden_size, num_layers):
+    """H1: an LSTM over the three steps, then a linear layer on every step."""
+
+    class _Net(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.lstm = torch.nn.LSTM(3, hidden_size, num_layers, batch_first=True)
+            self.head = torch.nn.Linear(hidden_size, 2)
+
+        def forward(self, x):
+            out, _ = self.lstm(x)  # zero initial states
+            return self.head(out)
+
+    return _Net()
+
+
+def _scaler(inputs, targets):
+    """H2: mean and standard deviation of each input feature and coordinate."""
+    def stats(a):
+        flat = a.reshape(-1, a.shape[-1])
+        std = flat.std(axis=0)
+        return flat.mean(axis=0), np.where(std > 0, std, 1.0)
+
+    in_mean, in_std = stats(inputs)
+    out_mean, out_std = stats(targets)
+    return {"in_mean": in_mean, "in_std": in_std,
+            "out_mean": out_mean, "out_std": out_std}
+
+
+class ClstmPredictor:
+    """CLSTM: one LSTM network per vessel type (C2), or one for all (the LSTM).
+
+    Parameters
+    ----------
+    context : bool
+        ``True``: a network per ``samples.group`` value (CLSTM).  ``False``: one
+        network for every sample, ignoring the group (the ordinary LSTM).
+    hidden_size, num_layers : int
+        The LSTM of H1.
+    lr, batch_size, max_epochs : float, int, int
+        Adam and its schedule (H4).
+    patience, validation_size : int, float
+        Early stopping (H5): the epochs without improvement that end the
+        training, and the share of the training trajectories held out.
+    min_samples : int
+        A group with fewer samples gets no network (C12).
+    seed : int
+        Seeds numpy and torch (H6).
+    device : str
+        ``"auto"`` is ``"cuda"`` when available, else ``"cpu"``; or any string
+        :class:`torch.device` accepts.
+
+    Attributes
+    ----------
+    groups_ : list of str
+        The groups with a network, sorted.
+    dropped_groups_ : list of str
+        The groups with fewer than ``min_samples`` samples, sorted.
+    history_ : dict
+        Group -> list of ``(epoch, train_loss, validation_loss)``; the
+        validation loss is NaN when there was none.
+
+    Raises
+    ------
+    ImportError
+        On construction, if PyTorch is not installed.
+    """
+
+    _CONFIG = ("context", "hidden_size", "num_layers", "lr", "batch_size",
+               "max_epochs", "patience", "validation_size", "min_samples", "seed")
+
+    def __init__(self, *, context=True, hidden_size=64, num_layers=1, lr=1e-3,
+                 batch_size=256, max_epochs=200, patience=10,
+                 validation_size=0.1, min_samples=200, seed=0, device="auto"):
+        torch = _torch()
+        self.context = bool(context)
+        self.hidden_size = int(hidden_size)
+        self.num_layers = int(num_layers)
+        self.lr = float(lr)
+        self.batch_size = int(batch_size)
+        self.max_epochs = int(max_epochs)
+        self.patience = int(patience)
+        self.validation_size = float(validation_size)
+        self.min_samples = int(min_samples)
+        self.seed = int(seed)
+        if min(self.batch_size, self.max_epochs, self.hidden_size) < 1:
+            raise ValueError("batch_size, max_epochs and hidden_size must be positive")
+        if device == "auto":
+            device = "cuda" if torch.cuda.is_available() else "cpu"
+        self.device = str(device)
+        torch.device(self.device)  # refuse an unknown device now
+        self._models = {}
+        self._info = {}
+        self.groups_ = []
+        self.dropped_groups_ = []
+        self.history_ = {}
+        self._fitted = False
+
+    # -------------------------------------------------------------- fit
+
+    def _keys(self, samples):
+        if not self.context:
+            return np.full(len(samples), "all", dtype=object)
+        return samples.group.astype(str).astype(object)
+
+    def fit(self, samples):
+        """Train one network per group (H1-H6); returns ``self``."""
+        torch = _torch()
+        if len(samples) == 0:
+            raise ValueError("no samples to fit")
+        keys = self._keys(samples)
+        self._models, self._info, self.history_ = {}, {}, {}
+        dropped = []
+        for name in sorted(set(keys.tolist())):
+            part = samples.subset(keys == name)
+            if len(part) < self.min_samples:
+                dropped.append(name)
+                continue
+            self._train_group(torch, name, part)
+        self.groups_ = sorted(self._models)
+        self.dropped_groups_ = dropped
+        self._fitted = True
+        return self
+
+    def _train_group(self, torch, name, part):
+        device = torch.device(self.device)
+        np.random.seed(self.seed)
+        torch.manual_seed(self.seed)
+        val_idx = None
+        train_idx = np.arange(len(part))
+        if len(set(part.trajectory.tolist())) >= 2 and self.validation_size > 0:
+            _, held = split_by_trajectory(part, self.validation_size, self.seed)
+            in_val = np.isin(part.trajectory.astype(str), held.trajectory.astype(str))
+            train_idx = np.flatnonzero(~in_val)
+            val_idx = torch.as_tensor(np.flatnonzero(in_val), device=device)
+        # H2: the scalers come from the training trajectories only.
+        scaler = _scaler(part.inputs[train_idx], part.targets[train_idx])
+        x = (part.inputs - scaler["in_mean"]) / scaler["in_std"]
+        y = (part.targets - scaler["out_mean"]) / scaler["out_std"]
+        x = torch.as_tensor(x, dtype=torch.float32, device=device)
+        y = torch.as_tensor(y, dtype=torch.float32, device=device)
+        train_idx = torch.as_tensor(train_idx, device=device)
+
+        net = _network(torch, self.hidden_size, self.num_layers).to(device)
+        optimiser = torch.optim.Adam(net.parameters(), lr=self.lr)
+        loss_fn = torch.nn.MSELoss()
+        generator = torch.Generator().manual_seed(self.seed)
+        history, best, best_state, stale = [], np.inf, None, 0
+        for epoch in range(1, self.max_epochs + 1):
+            net.train()
+            order = train_idx[torch.randperm(len(train_idx), generator=generator)
+                              .to(device)]
+            # Summed on the device: a float() per batch would wait for the GPU.
+            total = torch.zeros((), device=device)
+            for start in range(0, len(order), self.batch_size):
+                batch = order[start:start + self.batch_size]
+                optimiser.zero_grad()
+                loss = loss_fn(net(x[batch]), y[batch])
+                loss.backward()
+                optimiser.step()
+                total += loss.detach() * len(batch)
+            total = float(total)
+            val_loss = np.nan
+            if val_idx is not None:
+                net.eval()
+                with torch.no_grad():
+                    val_loss = float(loss_fn(net(x[val_idx]), y[val_idx]))
+                if val_loss < best:
+                    best, stale = val_loss, 0
+                    best_state = copy.deepcopy(net.state_dict())
+                else:
+                    stale += 1
+            history.append((epoch, total / len(order), val_loss))
+            if val_idx is not None and stale >= self.patience:
+                break
+        if best_state is not None:
+            net.load_state_dict(best_state)
+        net.eval()
+        self._models[name] = (net, scaler)
+        self._info[name] = {
+            "samples": int(len(part)), "epochs": len(history),
+            "best_validation_loss": float(best) if val_idx is not None else np.nan,
+        }
+        self.history_[name] = history
+
+    # ---------------------------------------------------------- predict
+
+    def predict(self, samples):
+        """Absolute predicted positions, shape ``(m, steps, 2)``.
+
+        Rows of a group with no network are NaN (C12).
+        """
+        self._check_fitted()
+        torch = _torch()
+        device = torch.device(self.device)
+        out = np.full(samples.targets.shape, np.nan)
+        keys = self._keys(samples)
+        for name, (net, scaler) in self._models.items():
+            rows = np.flatnonzero(keys == name)
+            for start in range(0, rows.size, _PREDICT_BATCH):
+                sel = rows[start:start + _PREDICT_BATCH]
+                x = (samples.inputs[sel] - scaler["in_mean"]) / scaler["in_std"]
+                x = torch.as_tensor(x, dtype=torch.float32, device=device)
+                with torch.no_grad():
+                    z = net(x).cpu().numpy().astype(np.float64)
+                out[sel] = z * scaler["out_std"] + scaler["out_mean"]
+        return out
+
+    def _check_fitted(self):
+        if not self._fitted:
+            raise RuntimeError("this ClstmPredictor is not fitted: call fit first")
+
+    # ---------------------------------------------------- save and load
+
+    def save(self, path):
+        """Write the configuration, the networks and their scalers to one file."""
+        self._check_fitted()
+        torch = _torch()
+        payload = {
+            "config": {name: getattr(self, name) for name in self._CONFIG},
+            "dropped": list(self.dropped_groups_),
+            "history": {k: [tuple(r) for r in v] for k, v in self.history_.items()},
+            "info": self._info,
+            "networks": {
+                name: {
+                    "state_dict": {k: v.detach().cpu()
+                                   for k, v in net.state_dict().items()},
+                    "scaler": {k: torch.as_tensor(v) for k, v in scaler.items()},
+                }
+                for name, (net, scaler) in self._models.items()
+            },
+        }
+        torch.save(payload, path)
+
+    @classmethod
+    def load(cls, path, device="auto"):
+        """Read a predictor written by :meth:`save`, onto ``device``."""
+        torch = _torch()
+        payload = torch.load(path, map_location="cpu", weights_only=True)
+        self = cls(device=device, **payload["config"])
+        for name, entry in payload["networks"].items():
+            net = _network(torch, self.hidden_size, self.num_layers)
+            net.load_state_dict(entry["state_dict"])
+            net.to(torch.device(self.device)).eval()
+            scaler = {k: v.numpy().astype(np.float64)
+                      for k, v in entry["scaler"].items()}
+            self._models[name] = (net, scaler)
+        self._info = payload["info"]
+        self.groups_ = sorted(self._models)
+        self.dropped_groups_ = list(payload["dropped"])
+        self.history_ = {k: [tuple(r) for r in v]
+                         for k, v in payload["history"].items()}
+        self._fitted = True
+        return self
+
+    # ----------------------------------------------------------- report
+
+    def summary(self):
+        """Per group: training samples, epochs run, best validation loss."""
+        if not self._fitted:
+            return "ClstmPredictor (not fitted)"
+        kind = "CLSTM, one network per group" if self.context else "LSTM, one network"
+        lines = [f"{kind}; device {self.device}"]
+        for name in self.groups_:
+            info = self._info[name]
+            best = info["best_validation_loss"]
+            best = "none" if np.isnan(best) else f"{best:.5f}"
+            lines.append(
+                f"  {name}: {info['samples']} samples, {info['epochs']} epochs, "
+                f"best validation loss {best}"
+            )
+        dropped = ", ".join(self.dropped_groups_) or "none"
+        lines.append(f"dropped (fewer than {self.min_samples} samples): {dropped}")
+        return "\n".join(lines)

@@ -10,6 +10,7 @@ package does not.
 """
 
 from .clstm import (
+    ClstmPredictor,
     PredictionSamples,
     make_samples,
     prediction_errors,
@@ -24,5 +25,6 @@ __all__ = [
     "PredictionSamples",
     "make_samples",
     "split_by_trajectory",
+    "ClstmPredictor",
     "prediction_errors",
 ]
