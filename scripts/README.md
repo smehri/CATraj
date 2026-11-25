@@ -1,35 +1,29 @@
 # scripts — command-line scripts
 
 Everything here runs from the repository root, in the `catraj` environment
-with the package installed (`pip install -e .`, see the main README).
+with the package installed (`pip install -e ".[dev]"`, see the main README).
 
 | script | what it does |
 |---|---|
-| `download_data.py` | downloads the public Zenodo archive (AIS, weather, sea state, coastline) into `data/zenodo_1167595/`, verifying checksums ([`docs/getting_the_data.md`](../docs/getting_the_data.md)) |
-| `prepare_zenodo.py` | run after the download: renames the archive's coded columns, sets "not available" codes to NaN, median-filters the columns the notebooks use, writes `data/zenodo_1167595/preprocessed/` (Parquet; needs `pyarrow`; also makes `data/sample/preprocessed` from `data/sample/raw`, see `--data` and `--out`) |
-| `cadp_on_annotated_fleet.py` | runs CADP over the whole annotated fleet (below) |
+| `download_data.py` | downloads the public Zenodo archive (AIS, weather, sea state, coastline) into `data/zenodo_1167595/`, verifying checksums; `--months all` for every sea-state month ([`docs/getting_the_data.md`](../docs/getting_the_data.md)) |
+| `prepare_zenodo.py` | run after the download: `catraj.preprocessing.preprocess_archive` on the whole archive. Renames the coded columns, sets "not available" codes to NaN, checks ranges, projects to EPSG:32630, median-filters the columns the notebooks use, writes `data/zenodo_1167595/preprocessed/` (Parquet; needs `pyarrow`; `--n-jobs -1` uses every core; `--data` and `--out` choose other folders, as for the sample) |
+| `make_sample.py` | cuts the committed two-day sample `data/sample/raw/` from the downloaded archive (the window, area and sea-state month are options) |
+| `cadp_on_annotated_fleet.py` | an earlier, standalone run of CADP over an annotated fleet (below) |
 
-## Whole-archive processing
+The notebooks do the same work with explanations: `01_preprocessing` for the first two, and `04_cadp_compression` for the last.
 
-`cadp_on_annotated_fleet.py` runs a `catraj` method over a whole dataset end
-to end, reading from and writing to `results/`. The notebooks explain the
-methods; this applies them at scale.
+## `cadp_on_annotated_fleet.py`
 
-| script | reads | writes |
-|---|---|---|
-| `cadp_on_annotated_fleet.py` | `results/01_trajectory_annotation/06_fleet_annotated.parquet`, every AIS position of the archive with the weather it met (from `notebooks/01_trajectory_annotation.ipynb`, `EXPORT_FLEET = True`) | `results/02_cadp_compression/`: the compressed fleet in both CADP modes, a per-vessel table and `summary.json` |
-
-```bash
-python scripts/download_data.py annotation     # once: the Zenodo archive (~203 MB)
-python scripts/prepare_zenodo.py               # once: cleaned Parquet files for the notebooks
-# run notebooks/01_trajectory_annotation.ipynb with the full archive and EXPORT_FLEET = True
-python scripts/cadp_on_annotated_fleet.py
-```
-
-The data, and the order to run things in, are explained in
-[`docs/getting_the_data.md`](../docs/getting_the_data.md).
-
-### CADP on the annotated fleet
+An earlier, standalone run of CADP over a whole annotated fleet, kept as a
+script. **Notebook `04_cadp_compression` replaces it** for the current
+workflow: it annotates the preprocessed AIS with the sea state itself,
+compresses every trip, and works on the sample and on the full archive. The
+script reads `results/01_trajectory_annotation/06_fleet_annotated.parquet`,
+which only an earlier version of the annotation notebook wrote (the current
+`notebooks/02_trajectory_annotation.ipynb` writes
+`results/02_trajectory_annotation/<DATA>/annotated_ais.parquet`, with other
+columns), so it does not run on a fresh checkout. It writes
+`results/02_cadp_compression/`.
 
 Each vessel is one trajectory. Settings are constants at the top of the
 script, and every run records them in `summary.json`:

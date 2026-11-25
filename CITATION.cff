@@ -6,7 +6,8 @@ title: "catraj: Context-Aware Trajectory Processing"
 abstract: >-
   Reference implementations of context-aware trajectory annotation, compression
   and prediction algorithms developed during the doctoral research of Saeed
-  Mehri, compatible with the MovingPandas library. It implements trajectory
+  Mehri, compatible with the MovingPandas library. It also preprocesses the
+  public AIS archive its notebooks use. It implements trajectory
   annotation -- spatial interpolation across observation stations followed by
   temporal interpolation through time, so every trajectory point carries the
   conditions the moving object passed through -- and Context-Aware
@@ -15,7 +16,8 @@ abstract: >-
   which keeps the points whose removal would change the trajectory's
   topological signature: a crossing of a barrier such as a shoreline, passing
   it on the other side, or a changed self-intersection. Two-stage CPLS adds
-  stay-point preservation to CPLS.
+  stay-point preservation to CPLS. The Context-aware LSTM (CLSTM) predicts a
+  vessel's next positions with one network per vessel type.
 type: software
 authors:
   - family-names: Mehri
@@ -29,8 +31,10 @@ keywords:
   - context awareness
   - movement data
   - spatial interpolation
+  - trajectory compression
+  - trajectory prediction
 
-# The annotation method implemented in this release.
+# The annotation method; the other algorithms are cited under references.
 preferred-citation:
   type: article
   title: "A context-aware approach for vessels' trajectory prediction"
@@ -81,7 +85,7 @@ references:
     end: 45613
     year: 2021
     doi: 10.1109/ACCESS.2021.3066463
-    notes: "CPLS and two-stage CPLS trajectory compression, implemented in catraj.compression. CLSTM is planned for a future release."
+    notes: "CPLS and two-stage CPLS trajectory compression, implemented in catraj.compression, and the CLSTM vessel-movement predictor, implemented in catraj.prediction (the choices made where the paper is open are documented in catraj.prediction.clstm)."
 
   - type: software
     title: "MovingPandas: Efficient Structures for Movement Data in Python"

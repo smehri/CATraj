@@ -16,8 +16,8 @@ wildlife, pedestrians. The maritime data in the examples is one application,
 not the scope.
 
 **This release implements trajectory annotation, CADP compression, CPLS
-compression and 2stage-CPLS compression.** The prediction algorithm below is
-being added in a later release.
+compression, 2stage-CPLS compression and CLSTM prediction.** The preprocessing
+of the public AIS archive they are demonstrated on is part of the package too.
 
 ---
 
@@ -29,7 +29,7 @@ being added in a later release.
 | **CADP** | Context-Aware Douglas–Peucker. Extends DP with three context domains — environmental, internal, semantic — retaining points that carry contextual information a purely spatial criterion would discard. | 2025 | **implemented** |
 | **CPLS** | Context-aware Piecewise Linear Segmentation. Guarantees logical consistency, e.g., a compressed (simplified) vessel trajectory may not cross the shoreline, and keeps its topological signature (barriers, direction, self-intersections). | 2021 | **implemented** |
 | **2stage-CPLS** | CPLS plus stay-point preservation. | 2021 | **implemented** |
-| **CLSTM** | Context-aware LSTM. Routes each trajectory to a per-type network, avoiding Simpson's paradox in a single global model. | 2021, 2023 | planned |
+| **CLSTM** | Context-aware LSTM. Routes each trajectory to a per-type network, avoiding Simpson's paradox in a single global model. The choices made where the paper is open (including what the network learns) are documented in `catraj.prediction.clstm`. | 2021, 2023 | **implemented** |
 
 ---
 
@@ -51,14 +51,16 @@ publisher via the DOI. The implementation does not depend on having them.
 
 | folder | what it holds |
 |---|---|
-| [`src/catraj/`](src/catraj/) | the library: `annotation`, `preprocessing`, `compression` |
+| [`src/catraj/`](src/catraj/) | the library: `annotation`, `preprocessing`, `compression`, `prediction`, `datasets` |
 | [`tests/`](tests/) | the test suite (`pytest`) |
-| [`notebooks/`](notebooks/) | the tutorials, in reading order |
+| [`notebooks/`](notebooks/) | the notebooks, in reading order |
 | [`scripts/`](scripts/) | command-line scripts: the data downloader and whole-archive workflows |
 | [`app/`](app/) | the interactive annotation app |
-| [`data/`](data/) | all data: the two-day sample in `sample/` (raw and preprocessed), committed; the downloaded archive in `zenodo_1167595/` and built files in `cache/`, not committed |
+| [`data/`](data/) | all data: the two-day sample in `sample/` (raw and preprocessed), committed; the downloaded archive in `zenodo_1167595/` (and its `preprocessed/` folder), not committed |
 | `results/` | everything the notebooks, scripts and app write, not committed ([`README`](results/README.md)) |
 | [`docs/`](docs/) | the source papers (open-access ones) and [`getting_the_data.md`](docs/getting_the_data.md) |
+| [`binder/`](binder/) | the environment Binder builds for the notebooks |
+| [`CLSTM_GUIDE.md`](CLSTM_GUIDE.md), [`CPLS_PHASE1_GUIDE.md`](CPLS_PHASE1_GUIDE.md) | historical implementation briefs for CLSTM and CPLS, kept for reference; the docstrings and notebooks describe the code as it is |
 
 ---
 
@@ -68,13 +70,61 @@ The notebooks run live on [Binder](https://mybinder.org) with no install and no 
 
 | Notebook | Purpose | Run | View | Full-archive run |
 |---|---|---|---|---|
-| `01_preprocessing` | Rename, check and clean the AIS, weather and sea-state files step by step on the sample; downloads and preprocesses the full archive. | [![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/smehri/CATraj/main?labpath=notebooks%2F01_preprocessing.ipynb) | [nbviewer](https://nbviewer.org/github/smehri/CATraj/blob/main/notebooks/01_preprocessing.ipynb) | this notebook covers the full archive itself |
+| `01_preprocessing` | Rename, check and clean the AIS, weather, sea-state and coastline files step by step on the sample; downloads and preprocesses the full archive. | [![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/smehri/CATraj/main?labpath=notebooks%2F01_preprocessing.ipynb) | [nbviewer](https://nbviewer.org/github/smehri/CATraj/blob/main/notebooks/01_preprocessing.ipynb) | this notebook covers the full archive itself |
 | `02_trajectory_annotation` | Annotate every vessel with weather and sea state, on the sample and on the full archive. | [![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/smehri/CATraj/main?labpath=notebooks%2F02_trajectory_annotation.ipynb) | [nbviewer](https://nbviewer.org/github/smehri/CATraj/blob/main/notebooks/02_trajectory_annotation.ipynb) | [`full_runs/02_trajectory_annotation.ipynb`](notebooks/full_runs/02_trajectory_annotation.ipynb) |
-| `03_two_stage_cpls_compression` | Compress every trip with 2stage-CPLS, keeping the coastline constraint. | [![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/smehri/CATraj/main?labpath=notebooks%2F03_two_stage_cpls_compression.ipynb) | [nbviewer](https://nbviewer.org/github/smehri/CATraj/blob/main/notebooks/03_two_stage_cpls_compression.ipynb) | [`full_runs/03_two_stage_cpls_compression.ipynb`](notebooks/full_runs/03_two_stage_cpls_compression.ipynb) |
-| `04_cadp_compression` | CADP compression driven by sea state. | [![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/smehri/CATraj/main?labpath=notebooks%2F04_cadp_compression.ipynb) | [nbviewer](https://nbviewer.org/github/smehri/CATraj/blob/main/notebooks/04_cadp_compression.ipynb) | [`full_runs/04_cadp_compression.ipynb`](notebooks/full_runs/04_cadp_compression.ipynb) |
-| `05_clstm_prediction` | CLSTM trajectory prediction (CPU PyTorch). | [![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/smehri/CATraj/main?labpath=notebooks%2F05_clstm_prediction.ipynb) | [nbviewer](https://nbviewer.org/github/smehri/CATraj/blob/main/notebooks/05_clstm_prediction.ipynb) | [`full_runs/05_clstm_prediction.ipynb`](notebooks/full_runs/05_clstm_prediction.ipynb) |
+| `03_two_stage_cpls_compression` | Compress every trip of every vessel with 2stage-CPLS, keeping the coastline constraint. | [![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/smehri/CATraj/main?labpath=notebooks%2F03_two_stage_cpls_compression.ipynb) | [nbviewer](https://nbviewer.org/github/smehri/CATraj/blob/main/notebooks/03_two_stage_cpls_compression.ipynb) | [`full_runs/03_two_stage_cpls_compression.ipynb`](notebooks/full_runs/03_two_stage_cpls_compression.ipynb) |
+| `04_cadp_compression` | CADP compression of every trip, driven by the sea state (depth, wave height, wave direction). | [![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/smehri/CATraj/main?labpath=notebooks%2F04_cadp_compression.ipynb) | [nbviewer](https://nbviewer.org/github/smehri/CATraj/blob/main/notebooks/04_cadp_compression.ipynb) | [`full_runs/04_cadp_compression.ipynb`](notebooks/full_runs/04_cadp_compression.ipynb) |
+| `05_clstm_prediction` | CLSTM trajectory prediction (PyTorch), trained on the clean trips and on the 2stage-CPLS output of notebook 03. | [![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/smehri/CATraj/main?labpath=notebooks%2F05_clstm_prediction.ipynb) | [nbviewer](https://nbviewer.org/github/smehri/CATraj/blob/main/notebooks/05_clstm_prediction.ipynb) | [`full_runs/05_clstm_prediction.ipynb`](notebooks/full_runs/05_clstm_prediction.ipynb) |
+
+The notebooks in `notebooks/` run on the sample. [`notebooks/full_runs/`](notebooks/full_runs/) holds copies of notebooks 02 to 05 executed on the full archive, outputs kept, so the numbers of the whole archive can be read without rerunning anything (notebook 01 covers the full archive in its own later parts).
 
 Binder offers about 2 GB of RAM and one or two CPUs, so it is meant for the sample only. The full-archive runs (several GB of downloads) are not meant for Binder: run them locally, see [`docs/getting_the_data.md`](docs/getting_the_data.md).
+
+### Running the notebooks
+
+**On Binder** (the sample): click a Run badge above. Nothing to install.
+
+**Locally**: create the environment, either `pip install -e ".[dev]"` (see [Installation](#installation); `dev` adds the app, MovingPandas, pyarrow and PyTorch to the library) or `conda env create -f binder/environment.yml` followed by `pip install -e .`. Then open the notebooks in JupyterLab or VS Code with that environment as the kernel.
+
+Two settings at the top of notebooks 02 to 05 choose what they run on; each reads an environment variable, so a notebook can be switched without editing it:
+
+| setting | environment variable | meaning |
+|---|---|---|
+| `DATA` | `CATRAJ_DATA` | `"sample"` (default) or `"full"`; the results go to `results/<notebook>/<DATA>/` |
+| `N_JOBS` | `CATRAJ_N_JOBS` | worker processes; `-1` (default) uses every core, `1` is serial |
+
+Notebook 05 also has `DEVICE` (`CATRAJ_DEVICE`, `"auto"` uses a GPU when there is one, `"cpu"` forces the CPU).
+
+Run them in order, 01 to 05. Notebooks 02, 03 and 04 are independent of each other; **05 reads what 03 wrote** (`results/03_two_stage_cpls_compression/<DATA>/`), so run 03 with the same `DATA` first. **The full archive needs notebook 01 first**: set `DOWNLOAD = True` and `PREPROCESS_FULL = True` there (or run `scripts/download_data.py --months all` and `scripts/prepare_zenodo.py`, see [`docs/getting_the_data.md`](docs/getting_the_data.md)), then run 02 to 05 with `DATA = "full"`.
+
+From the command line:
+
+```bash
+python -m jupyter nbconvert --to notebook --execute --inplace notebooks/03_two_stage_cpls_compression.ipynb
+CATRAJ_DATA=full python -m jupyter nbconvert --to notebook --execute --inplace --ExecutePreprocessor.timeout=-1 notebooks/03_two_stage_cpls_compression.ipynb
+```
+
+(In PowerShell set the variable first: `$env:CATRAJ_DATA = "full"`.) `--inplace` overwrites the notebook with its executed copy, so use `--output` for a copy that leaves it as committed.
+
+**Windows with conda.** The kernel must find the environment's DLLs (matplotlib, MKL, GDAL): either start Jupyter from an activated environment, or put `<env>\Libraryin` on `PATH` for the kernel, for example in the kernel's `kernel.json` (see [Installation](#installation) for registering a kernel). Import `catraj` before numpy: `catraj/__init__.py` sets `MKL_THREADING_LAYER=SEQUENTIAL` (some Intel MKL builds abort the process on the first LAPACK call otherwise), and it only helps if it runs before numpy loads MKL. Notebooks 03 to 05 set the variable themselves in their first cell, before anything else is imported.
+
+---
+
+## Results on the full archive
+
+What the full-archive runs of the notebooks produced (five months, October to
+December 2015 and February to March 2016, 14.9 million AIS positions; January
+2016 is excluded). The numbers are those of the `summary.csv` and timing files
+in `results/<notebook>/full/` (not committed) and of the executed copies in
+[`notebooks/full_runs/`](notebooks/full_runs/); every notebook gives the same
+table for the sample.
+
+| notebook | result |
+|---|---|
+| `02_trajectory_annotation` | all 14,906,535 positions of 4,720 vessels annotated with all eight variables (wind speed, air temperature, air pressure, wind direction, sea level, wave height, wave length, wave direction), none missing; 197 s in total (`annotation_timing.csv`) |
+| `03_two_stage_cpls_compression` | 2stage-CPLS, ε 1 km, 1.54 m/s, stays of 100 m and 600 s, coastline as barrier: 14,777,418 points of 19,407 trips (2,076 vessels) become 1,636,505, a compression of 88.9 % (21,470 of the kept points are stay points); 270 s |
+| `04_cadp_compression` | CADP, one context at a time, on the same trips (points kept of 14,777,418): Douglas–Peucker alone 71,165 (99.5 %); depth 114,940 (99.2 %); wave height 4,836,798 (67.3 %); wave direction 8,306,633 (43.8 %); all three together 9,301,789 (37.1 %). `context_fidelity.csv` gives how far the dropped points' context lies from the compressed track |
+| `05_clstm_prediction` | **notebook 05 — full-archive run in progress** |
 
 ---
 
@@ -89,13 +139,13 @@ conda activate catraj
 
 git clone https://github.com/smehri/catraj
 cd catraj
-pip install -e ".[app]"
+pip install -e ".[dev]"
 ```
 
-Omit `[app]` for the library alone. `stonesoup` is only an optional extra of
+`[dev]` installs everything the notebooks and tests use (the app, MovingPandas, pyarrow for the Parquet files, PyTorch for CLSTM, pytest, black, ruff). Use `".[app]"`, `".[predict]"` and so on for a part, or omit the extras for the library alone. `stonesoup` is only an optional extra of
 MovingPandas, which warns on import without it.
 
-To run the tutorials from an editor (VS Code, JupyterLab) without activating
+To run the notebooks from an editor (VS Code, JupyterLab) without activating
 the environment first, register it as a kernel and pick **Python (catraj)**.
 The kernel carries the variables `conda activate` would set, so GDAL finds its
 data files:
@@ -137,9 +187,10 @@ traj["wind_speed"] = annotate_points(
 Millions of positions are fine: long inputs are processed in time blocks
 (`chunk_epochs`), DLT is evaluated for all positions at once, and `n_jobs=-1`
 spreads the blocks over every core (as it spreads epochs in
-`evaluate_spatial`). The whole six-month sample archive, 18 million positions,
-annotates in under a minute per variable on 32 cores (about 26 s for a linear
-variable, 49 s for a bearing).
+`evaluate_spatial`). In the full-archive run of notebook 02 (14.9 million
+positions, `n_jobs=-1`, `annotation_timing.csv`) a linear variable takes about
+18 to 19 s for the whole archive, a bearing 30 to 35 s, and all eight variables
+197 s in total.
 
 Context attaches as ordinary columns, so it survives the `.iloc` slicing that
 trajectory compression performs — a compressed trajectory keeps the context of
@@ -153,9 +204,9 @@ noisy, so `annotate_points` filters each station's observation series,
 compressed rows carry the filtered values. Time comes from `time_column` or a
 DatetimeIndex (MovingPandas); a plain numeric index without `time_column` is
 refused rather than filtered by row number. The array-level functions
-(`douglas_peucker`, `cadp_select`, `cpls_select`) filter nothing. The tutorials run
-the algorithms unfiltered, with `filter_window=None`, and show the default result next
-to it.
+(`douglas_peucker`, `cadp_select`, `cpls_select`) filter nothing. The notebooks read the preprocessed data, which
+is already median-filtered (30 s) by `preprocess_archive`, so they pass
+`filter_window=None` and do not filter a second time.
 
 `denoise` is the same step on its own, for another window, the mean (as in the
 paper) instead of the median, or one pass shared by several steps. It replaces
@@ -170,14 +221,17 @@ clean = denoise(traj, window=60, columns=["speed_over_ground"],
                 time_column="unix_time", by="mmsi")   # seconds; 30 by default
 ```
 
-On the earlier 24-hour sample (raw, 2016-02-05, 106,894 positions; no longer
-in the repository) it takes about 0.25 s, moves the median point by 0.0 m
-(95th percentile 22 m) at 30 s, and creates no land crossing that the raw track
-did not have there. Filtering the positions alone raises the number of points
-2stage-CPLS keeps (5,228 raw, 12,006 after a 30 s median) because filtered
-positions repeat; filtering its speed series too, as it does by default, brings
-it to 4,759. `help(catraj.preprocessing.filtering)` has the table and the
-decisions. Hourly station series are unchanged by a 30 s window.
+Measured on the committed sample's raw AIS (the 237,318 positions of 565
+vessels after the range, duplicate and jump checks, before the filter; one
+core): a 30 s median of positions, speed, course and heading takes 0.4 s, moves
+the median point by 0.0 m (95th percentile 25 m, maximum 305 m), and turns 2
+segments into land crossings that the raw segment between the same two rows did
+not have (22,666 segments of the raw tracks already intersect the sample's
+coastline; 22,662 after filtering). It leaves 22,625
+raw points on land and 22,621 after. Hourly station series are unchanged by a
+30 s window: none of the 2,302 wind speed, air temperature and air pressure
+observations of the sample's 16 stations changes.
+`help(catraj.preprocessing.filtering)` has the decisions.
 
 Compression then uses those columns. CADP runs Douglas–Peucker, then adds back
 every point whose removal would misrepresent a context variable by more than
@@ -227,11 +281,14 @@ nearby barrier on the side it was;
 The self-intersection and inversion relations act on the track alone, and on
 raw AIS they are expensive: the GPS jitter of a moored vessel crosses itself
 thousands of times, and keeping those crossings keeps most of its points. On
-that sample at 1 km, the barrier relations alone keep 607 of 106,894
-points, all five 43,074 (about 40 s instead of 3 s), without filtering; with
-the default 30 s filter, 604 and 35,020. The paper's two-stage
-CPLS collapses stay points first and removes that jitter (below). Otherwise,
-switch relations off by keyword:
+the sample's raw positions at 1 km, one trajectory per vessel, one core: the
+barrier relations alone keep 2,457 of 237,318 points in 163 s (2,453 in 117 s
+with the default 30 s filter, which is included in the time). All five
+relations on the whole sample did not finish in 10 minutes, so compare them on
+the first 60 vessels by MMSI (33,943 positions): barrier relations alone keep
+280 points (278 filtered) in 1.1 s (1.2 s), all five 19,099 (16,804 filtered) in
+13.3 s (12.9 s). The paper's two-stage CPLS collapses stay points first and
+removes that jitter (below). Otherwise, switch relations off by keyword:
 
 ```python
 safe = cpls_compress(traj, epsilon=1_000, barriers=land, by="mmsi",
@@ -260,11 +317,16 @@ small = two_stage_cpls_compress(
 
 The result is a row subset of the input, except that the geometry of each
 stay's two kept rows is the centroid; a `stay` column marks them. On the
-same 24-hour sample (epsilon 1 km, 1.54 m/s, all five relations) status alone finds
-19 stays and keeps 44,369 of 106,894 points, hardly fewer than CPLS, because
-most moored vessels there do not report "at anchor"; adding movement detection
-(100 m, 10 minutes: 98 stays) keeps 5,228 unfiltered (`filter_window=None`) and
-4,759 with the default filter, in about 10 s.
+sample's raw positions (one trajectory per vessel, epsilon 1 km, 1.54 m/s, all
+five relations, one core), counting a stay as a run of consecutive stay points:
+status alone finds 56 stays (12,436 points) and movement detection added
+(100 m, 10 minutes) 242 (122,746 points). Status alone is no help to the
+compression, because most moored vessels do not report "at anchor": on the first
+60 vessels by MMSI (33,943 positions) it keeps 19,282 points in 12.0 s, as many
+as plain CPLS (19,099); with movement detection added, 3,120 in 2.8 s. On the
+whole sample, with movement detection, 2stage-CPLS keeps 16,889 of 237,318
+points in 35 s (`filter_window=None`) and 15,674 in 37 s with the default
+filter.
 `help(catraj.compression.two_stage)` lists the decisions behind it.
 
 There is also an interactive app, which compares interpolation methods by
@@ -276,8 +338,8 @@ python app/run_app.py       # or double-click app/"Run Annotation App.bat"
 
 | | |
 |---|---|
-| [`docs/getting_the_data.md`](docs/getting_the_data.md) | how to download the public archive the tutorials use: one command, by hand, checksums, troubleshooting |
-| [Notebooks](#notebooks) | the tutorials, in reading order, with Binder and nbviewer links |
+| [`docs/getting_the_data.md`](docs/getting_the_data.md) | how to download the public archive the notebooks use: one command, by hand, checksums, troubleshooting |
+| [Notebooks](#notebooks) | the notebooks, in reading order, with Binder and nbviewer links |
 | [`app/README.md`](app/README.md) | the app |
 | [`scripts/README.md`](scripts/README.md) | scripts that process the whole archive end to end |
 
@@ -293,7 +355,7 @@ it applies.
 
 `data/sample/` holds a two-day extract of the archive, 2015-11-09 00:00 to
 2015-11-11 00:00 UTC, in two forms: `raw/` (the archive's own CSV and shapefile
-layout, 60 MB) and `preprocessed/` (Parquet, 9 MB). The tutorials, the app and
+layout, 60 MB) and `preprocessed/` (Parquet, 9 MB). The notebooks, the app and
 the tests read the preprocessed form with `catraj.datasets`:
 
 | | | |
@@ -325,20 +387,24 @@ them; point it at your own data and the question does not arise.
 
 The sample is cut from a public six-month archive (October 2015 – March 2016)
 on Zenodo, [doi:10.5281/zenodo.1167595](https://doi.org/10.5281/zenodo.1167595)
-(Ray et al., 2019). The full annotation run, the CADP tutorial
-and the workflows use it, and so does the optional full-coastline section of
-the CPLS tutorial. It is not in the repository. Fetch it with:
+(Ray et al., 2019). The full-archive runs of notebooks 02 to 05 use it, after
+preprocessing. They cover October to December 2015 and February to March 2016:
+**January 2016 is excluded everywhere**, because the archive's `oc_january.csv`
+is a copy of `oc_november.csv`, so January's positions cannot be given a sea
+state. The archive is not in the repository. Fetch and preprocess it with
+notebook `01_preprocessing` (`DOWNLOAD = True`, `PREPROCESS_FULL = True`) or:
 
 ```bash
-python scripts/download_data.py              # ~825 MB; or: annotation (~203 MB) | cadp (~771 MB) | cpls (~53 MB)
-python scripts/download_data.py --check      # what is present
+python scripts/download_data.py --months all  # ~825 MB download, ~5.3 GB extracted; or: annotation (~203 MB) | cadp (~771 MB) | cpls (~53 MB)
+python scripts/download_data.py --check       # what is present
+python scripts/prepare_zenodo.py --n-jobs -1  # writes data/zenodo_1167595/preprocessed/ (about 2 minutes)
 ```
 
 The script uses only the standard library. It verifies each archive against
 the checksum Zenodo publishes, resumes interrupted downloads, and extracts into
 `data/zenodo_1167595/`, which git ignores.
 [`docs/getting_the_data.md`](docs/getting_the_data.md)
-covers everything else: which tutorial needs which files, downloading by hand,
+covers everything else: which notebook needs which files, downloading by hand,
 disk space, the order to run things in, troubleshooting, and the licences.
 The AIS data is CC BY-NC-SA 4.0 (no commercial use), the sea state must be
 cited, and the EEA coastline needs its source acknowledged.

@@ -1,8 +1,8 @@
 # data — all data
 
-All the data the project reads lives here, in three subfolders. Only `sample/`
-is committed. git ignores the other two because they are large and carry their
-own licences.
+All the data the project reads lives here. Only `sample/` is committed. git
+ignores `zenodo_1167595/` (the downloaded archive, and its `preprocessed/`
+folder) because it is large and carries its own licences.
 
 Two forms of the data exist. *Raw* is the Zenodo archive exactly as published
 (CSV files with coded column names and "not available" codes, and a
@@ -32,11 +32,10 @@ data/
 ├── zenodo_1167595/                 # not committed: the full archive, doi:10.5281/zenodo.1167595 (Ray et al., 2019)
 │   ├── P1_AIS_Data/                # nari_dynamic.csv, nari_static.csv, README_parameters.txt
 │   ├── P1_AIS_Codes/               # Ship Types List.csv, MMSI Country Codes.csv, ...
-│   ├── E1_ocean/                   # oc_<month>.csv (sea state), README_parameters.txt
+│   ├── E1_ocean/                   # oc_<month>.csv (sea state; January's is a copy of November's and is not used), README_parameters.txt
 │   ├── E2_Weather_Conditions/      # weather observations and stations
 │   ├── C2_European_Coastline/      # Europe Coastline (Polygone).shp (+ sidecars): the full EEA coastline
-│   └── preprocessed/               # not committed: scripts/prepare_zenodo.py writes AIS/ais.parquet, Weather/, Ocean/, Coastline/
-└── cache/                          # not committed: files the scripts build; safe to delete
+│   └── preprocessed/               # not committed: scripts/prepare_zenodo.py (or notebook 01) writes AIS/ais.parquet, Weather/, Ocean/ocean_<month>.parquet, Coastline/
 ```
 
 ## `sample/`: works without a download
@@ -70,8 +69,11 @@ land = load_coastline()
 
 | used by | needs |
 |---|---|
-| `notebooks/01_trajectory_annotation.ipynb` (`SOURCE = "sample"`) | `preprocessed/AIS`, `preprocessed/Weather` |
-| `notebooks/03_cpls_compression.ipynb` | `preprocessed/AIS`, `preprocessed/Coastline` |
+| `notebooks/02_trajectory_annotation.ipynb` (`DATA = "sample"`) | `preprocessed/AIS`, `Weather`, `Ocean`, `Coastline` |
+| `notebooks/03_two_stage_cpls_compression.ipynb` | `preprocessed/AIS`, `preprocessed/Coastline` |
+| `notebooks/04_cadp_compression.ipynb` | `preprocessed/AIS`, `preprocessed/Ocean`, `preprocessed/Coastline` |
+| `notebooks/05_clstm_prediction.ipynb` | the output of notebook 03 (itself made from `preprocessed/AIS`, `Coastline`) |
+| `notebooks/01_preprocessing.ipynb` | `raw/` (every step of the preprocessing, on the sample) |
 | `app/` (the annotation app) | `preprocessed/AIS`, `preprocessed/Weather` |
 | `tests/` (tests marked `data`) | `preprocessed/` (all four), `raw/E2_Weather_Conditions/README_parameters.txt` |
 | `tests/test_archive.py`, `scripts/prepare_zenodo.py` | `raw/` |
@@ -97,16 +99,25 @@ or, from Python, `catraj.preprocessing.preprocess_archive(raw_root, out_root)`.
 `catraj.datasets.load_ais("data/zenodo_1167595/preprocessed")` and the other
 loaders read the result.
 
-You can also set `DOWNLOAD = True` in a notebook's settings cell, or download
-by hand. All three ways are explained step by step in
+The full-archive runs use the five months with a sea state: October to
+December 2015 and February to March 2016. **January 2016 is excluded** from
+every dataset: the archive's `oc_january.csv` is a byte copy of
+`oc_november.csv`, so January's positions cannot be given a sea state;
+preprocessing drops its AIS and weather rows and skips that file. To fetch all
+the sea-state months use `python scripts/download_data.py --months all`.
+
+You can also set `DOWNLOAD = True` and `PREPROCESS_FULL = True` in notebook
+`01_preprocessing`, or download by hand. All the ways are explained step by
+step in
 [`docs/getting_the_data.md`](../docs/getting_the_data.md).
 
 | used by | needs |
 |---|---|
 | `scripts/prepare_zenodo.py` | `P1_AIS_Data`, `P1_AIS_Codes`, `E1_ocean`, `E2_Weather_Conditions` (writes `preprocessed/`) |
-| `notebooks/01_trajectory_annotation.ipynb` (`SOURCE = "zenodo"`) | `preprocessed/AIS/ais.parquet`, `preprocessed/Weather/weather.parquet` |
-| `notebooks/02_cadp_compression.ipynb` | `preprocessed/AIS/ais.parquet`, `preprocessed/Ocean/ocean_february.parquet` |
-| `notebooks/03_cpls_compression.ipynb` (optional last section) | `C2_European_Coastline` |
+| `notebooks/02_trajectory_annotation.ipynb` (`DATA = "full"`) | `preprocessed/AIS`, `Weather`, `Ocean` (five months), `Coastline` |
+| `notebooks/03_two_stage_cpls_compression.ipynb` (`DATA = "full"`) | `preprocessed/AIS/ais.parquet`, `preprocessed/Coastline/coastline.parquet` |
+| `notebooks/04_cadp_compression.ipynb` (`DATA = "full"`) | `preprocessed/AIS`, `Ocean` (five months), `Coastline` |
+| `notebooks/05_clstm_prediction.ipynb` (`DATA = "full"`) | the full-archive output of notebook 03 |
 
 ## Licences
 

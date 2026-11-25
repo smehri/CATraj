@@ -71,7 +71,7 @@ docs/papers/*context-aware approach for vessels*
 #
 # Large, licence-restricted, and regenerated on every run. Only the README
 # that says what belongs in each folder is committed, plus the data licences
-# and the 24-hour sample in data/sample/ (re-included at the end of this file).
+# and the two-day sample in data/sample/ (re-included at the end of this file).
 # ---------------------------------------------------------------------------
 data/*
 !data/README.md

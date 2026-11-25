@@ -1,7 +1,7 @@
 # Getting the data
 
-This page shows how to get every dataset the tutorials and workflows
-use. Read it before you run anything beyond the two-day sample.
+This page shows how to get every dataset the notebooks and scripts use. Read it
+before you run anything beyond the two-day sample.
 
 The notebooks also run live on [Binder](https://mybinder.org/v2/gh/smehri/CATraj/main?urlpath=lab/tree/notebooks)
 with nothing to download: the two-day sample is already in the repository. Binder
@@ -15,7 +15,13 @@ python scripts/download_data.py
 ```
 
 It downloads about 825 MB from Zenodo, checks each file against its published
-checksum, and extracts what the code reads into `data/zenodo_1167595/`.
+checksum, and extracts what the code reads into `data/zenodo_1167595/`. By
+default it extracts one month of sea state (February); **the full-archive runs
+need five**, so use `--months all` (or `--months oct,nov,dec,feb,mar`):
+
+```bash
+python scripts/download_data.py --months all
+```
 Running it again is safe: an interrupted download resumes, and files already
 in place are skipped.
 
@@ -23,8 +29,11 @@ Then preprocess the files the notebooks read (renames the coded columns, checks
 ranges, projects to EPSG:32630, removes noise; section 5, step 0):
 
 ```bash
-python scripts/prepare_zenodo.py
+python scripts/prepare_zenodo.py --n-jobs -1
 ```
+
+Notebook `01_preprocessing` does both from inside Jupyter (`DOWNLOAD = True`,
+then `PREPROCESS_FULL = True`).
 
 ---
 
@@ -32,18 +41,18 @@ python scripts/prepare_zenodo.py
 
 | you want to run | data it needs | download |
 |---|---|---|
-| `notebooks/01_trajectory_annotation.ipynb` with the two-day sample (`SOURCE = "sample"`) | `data/sample/preprocessed/`, **already in the repository** | none |
-| `app/` (the annotation app) | `data/sample/preprocessed/`, already in the repository | none |
-| `notebooks/03_cpls_compression.ipynb` | `data/sample/preprocessed/` (AIS and coastline), already in the repository | none |
-| `notebooks/01_trajectory_annotation.ipynb` with the full archive (`SOURCE = "zenodo"`) | AIS data, AIS codes, weather | `download_data.py annotation` (~203 MB) |
-| `notebooks/02_cadp_compression.ipynb` | AIS data, ocean conditions | `download_data.py cadp` (~771 MB) |
-| `scripts/cadp_on_annotated_fleet.py` | the annotated fleet that tutorial 1 writes (section 5 below) | `download_data.py annotation` |
-| the last section of `notebooks/03_cpls_compression.ipynb` (optional: the full coastline) | European coastline | `download_data.py cpls` (~53 MB) |
+| any of notebooks `01` to `05` with `DATA = "sample"` (the default), the app, the tests | `data/sample/` (raw and preprocessed), **already in the repository** | none |
+| notebooks `02` to `04` with `DATA = "full"` | the preprocessed AIS, weather, sea state (five months) and coastline | `download_data.py --months all`, then `prepare_zenodo.py` (or notebook `01`) |
+| notebook `05` with `DATA = "full"` | the full-archive output of notebook `03` (`results/03_two_stage_cpls_compression/full/`) | run notebook `03` with `DATA = "full"` first |
+| `scripts/cadp_on_annotated_fleet.py` | `results/01_trajectory_annotation/06_fleet_annotated.parquet`, written by an earlier version of the annotation notebook (see `scripts/README.md`) | not part of the current notebooks |
+| `scripts/make_sample.py` (re-cutting the sample) | the downloaded archive (it extracts `oc_november.csv` from the sea-state zip itself) | `download_data.py` |
 
-With `SOURCE = "auto"`, the default, tutorial 1 uses the full archive if it has
-been downloaded and the sample otherwise. So it runs either way. The full
-archive must also have been preprocessed with `scripts/prepare_zenodo.py`
-(section 5): the notebooks read its files in `preprocessed/`, not the raw CSVs.
+The narrower download targets fetch part of the archive: `annotation` (AIS,
+codes, weather; ~203 MB), `cadp` (AIS and sea state; ~771 MB), `cpls` (the
+coastline; ~53 MB). The full-archive notebooks need all three, which is the
+default target. The full archive must also have been preprocessed
+(`scripts/prepare_zenodo.py` or notebook `01`; section 5): the notebooks read
+its files in `preprocessed/`, not the raw CSVs.
 
 ### The sample, raw and preprocessed
 
@@ -56,7 +65,8 @@ clipped to the AIS area. `data/sample/preprocessed/` is what
 `catraj.preprocessing.preprocess_archive` makes of it, with the same layout
 the full archive gets in `data/zenodo_1167595/preprocessed/`:
 `AIS/ais.parquet`, `Weather/weather.parquet`, `Ocean/ocean_november.parquet`,
-`Coastline/coastline.parquet` and `preprocessing_report.csv`/`.txt`. It was cut
+`Coastline/coastline.parquet`, `AIS/mmsi_check.csv` and
+`preprocessing_report.csv`/`.txt`. It was cut
 by `scripts/make_sample.py` (which needs this download) and preprocessed with
 `scripts/prepare_zenodo.py --data data/sample/raw --out data/sample/preprocessed`.
 Read either with `catraj.datasets` (`load_ais`, `load_weather`, `load_ocean`,
@@ -80,24 +90,31 @@ It covers 1 October 2015 to 31 March 2016, longitude −10° to 0° and latitude
 | [`[P1] AIS Data.zip`](https://zenodo.org/records/1167595/files/%5BP1%5D%20AIS%20Data.zip?download=1) | 201.4 MB | `nari_dynamic.csv` (1,125 MB, 19 million positions), `nari_static.csv` (86 MB, vessel type), `README_parameters.txt` | `90bec666a3c3474e18bb57676348b655` |
 | [`[P1] AIS Status, Codes and Types.zip`](https://zenodo.org/records/1167595/files/%5BP1%5D%20AIS%20Status%2C%20Codes%20and%20Types.zip?download=1) | 8 kB | all 6 files; `Ship Types List.csv` names vessel types | `6f9bb328d6e657b16fea55210a6e56cf` |
 | [`[E2] Weather Conditions.zip`](https://zenodo.org/records/1167595/files/%5BE2%5D%20Weather%20Conditions.zip?download=1) | 1.3 MB | all 5 files (6 MB); 16 coastal stations, hourly | `d8ac0644a670f584daaa4a450cf2baa7` |
-| [`[E1] Ocean Conditions.zip`](https://zenodo.org/records/1167595/files/%5BE1%5D%20Ocean%20Conditions.zip?download=1) | 569.8 MB | `oc_february.csv` (675 MB; WAVEWATCH III sea state, 3-hourly, 43,206 sea points), `README_parameters.txt` | `20a1c8f8a6bbbd9bdf9821f938f22add` |
+| [`[E1] Ocean Conditions.zip`](https://zenodo.org/records/1167595/files/%5BE1%5D%20Ocean%20Conditions.zip?download=1) | 569.8 MB | `oc_<month>.csv` for the months chosen with `--months` (about 675 MB each; WAVEWATCH III sea state, 3-hourly, 43,206 sea points), `README_parameters.txt` | `20a1c8f8a6bbbd9bdf9821f938f22add` |
 | [`[C2] European Coastline.zip`](https://zenodo.org/records/1167595/files/%5BC2%5D%20European%20Coastline.zip?download=1) | 52.6 MB | `Europe Coastline (Polygone).shp` with its `.shx`, `.dbf`, `.prj` (54 MB; 71,514 land polygons, EPSG:3035), `README_parameters.txt` | `52036af60c8427fcda4b867c706bf649` |
 
 The ocean archive holds one file per month, `oc_october.csv` to
-`oc_march.csv`, about 700 MB each. The tutorials use February 2016 only.
+`oc_march.csv`, about 700 MB each. The full-archive notebooks use October to
+December 2015 and February and March 2016. **January 2016 is left out of every
+dataset**: the record's `oc_january.csv` is a byte copy of `oc_november.csv`, so
+January's AIS positions could not be given a sea state (preprocessing drops its
+AIS and weather rows and skips that file).
 
 ### Disk space
 
 | | download | on disk once extracted |
 |---|---|---|
 | `annotation` | 203 MB | 1.2 GB |
-| `cadp` | 771 MB | 1.9 GB |
+| `cadp` (February only) | 771 MB | 1.9 GB |
 | `cpls` | 53 MB | 54 MB |
-| `all` | 825 MB | 2.0 GB |
+| `all`, `--months feb` (default) | 825 MB | 2.0 GB |
+| `all`, `--months all` | 825 MB | about 5.3 GB (the six sea-state months are 4 GB of it) |
 
 The archives are kept by default (about 820 MB more), so nothing is downloaded
 twice. Pass `--remove-zips` to delete each one after it is extracted. Running
-the code adds more output: up to about 2 GB in `results/`.
+the code adds more: `preprocessed/` is 0.5 GB, and the full-archive runs of
+notebooks 02 to 04 write 2.3 GB to `results/` (measured on the runs in this
+repository: 0.7, 0.5 and 1.1 GB).
 
 ---
 
@@ -109,16 +126,17 @@ All three put the files in the same place (section 4). Pick one.
 
 ```bash
 conda activate catraj                               # any Python 3.10+ works; only the standard library is used
-python scripts/download_data.py                # everything
-python scripts/download_data.py annotation     # tutorial 1 only
-python scripts/download_data.py cadp           # tutorial 2
-python scripts/download_data.py cpls           # the full coastline for tutorial 3
+python scripts/download_data.py                # everything (sea state: February only)
+python scripts/download_data.py --months all   # everything, every sea-state month: what the full-archive notebooks use
+python scripts/download_data.py annotation     # AIS, codes and weather only
+python scripts/download_data.py cadp           # AIS and sea state only
+python scripts/download_data.py cpls           # the coastline only
 python scripts/download_data.py --check        # report what is present, download nothing
 ```
 
 | option | effect |
 |---|---|
-| `--months feb,jan` | sea-state months to extract: any of `oct nov dec jan feb mar`, or `all` (default `feb`) |
+| `--months oct,nov,dec,feb,mar` | sea-state months to extract: any of `oct nov dec jan feb mar`, or `all` (default `feb`). January's file is a copy of November's and is not used |
 | `--remove-zips` | delete each archive after extracting it |
 | `--check` | list what is present; exits with 1 if anything is missing |
 
@@ -127,11 +145,11 @@ location. `python scripts/download_data.py --help` lists the options.
 
 ### B · From inside a notebook
 
-Both tutorials have a `DOWNLOAD` switch in their settings cell. Set
-`DOWNLOAD = True` and run the cell. The notebook fetches the archives it needs
-and verifies the same checksums. Set it back to `False` afterwards. The script
-and the notebooks name the archives the same way, so whichever runs second
-finds the files already there.
+Notebook `01_preprocessing` has a `DOWNLOAD` switch in its settings cell. Set
+`DOWNLOAD = True` and run the cell (Part 2). The notebook fetches all five
+archives, with every sea-state month, and verifies the same checksums. Set it
+back to `False` afterwards. The script and the notebook name the archives the
+same way, so whichever runs second finds the files already there.
 
 ### C · By hand
 
@@ -165,14 +183,16 @@ or if you want a download manager.
    ```
 
 3. **Extract** into the folders the code expects (section 4). Extract only
-   the month you need from the ocean archive: it holds 4.2 GB in all.
+   the months you need from the ocean archive (it holds 4.2 GB in all): for the
+   full-archive notebooks `oc_october`, `oc_november`, `oc_december`,
+   `oc_february` and `oc_march`.
 
    ```bash
    # Linux / macOS (unzip)
    unzip -n P1_AIS_Data.zip nari_dynamic.csv nari_static.csv README_parameters.txt -d P1_AIS_Data
    unzip -n P1_AIS_Status_Codes_and_Types.zip -d P1_AIS_Codes
    unzip -n E2_Weather_Conditions.zip -d E2_Weather_Conditions
-   unzip -n E1_Ocean_Conditions.zip oc_february.csv README_parameters.txt -d E1_ocean
+   unzip -n E1_Ocean_Conditions.zip "oc_*.csv" README_parameters.txt -d E1_ocean
    unzip -n C2_European_Coastline.zip "Europe Coastline (Polygone).*" README_parameters.txt -d C2_European_Coastline
    ```
 
@@ -182,7 +202,7 @@ or if you want a download manager.
    tar -xf P1_AIS_Data.zip -C P1_AIS_Data nari_dynamic.csv nari_static.csv README_parameters.txt
    tar -xf P1_AIS_Status_Codes_and_Types.zip -C P1_AIS_Codes
    tar -xf E2_Weather_Conditions.zip -C E2_Weather_Conditions
-   tar -xf E1_Ocean_Conditions.zip -C E1_ocean oc_february.csv README_parameters.txt
+   tar -xf E1_Ocean_Conditions.zip -C E1_ocean oc_october.csv oc_november.csv oc_december.csv oc_february.csv oc_march.csv README_parameters.txt
    tar -xf C2_European_Coastline.zip -C C2_European_Coastline "Europe Coastline (Polygone).shp" "Europe Coastline (Polygone).shx" "Europe Coastline (Polygone).dbf" "Europe Coastline (Polygone).prj" README_parameters.txt
    ```
 
@@ -200,29 +220,28 @@ committed two-day sample in `sample/`.
 ```
 data/
 ├── sample/                           the two-day sample, raw/ and preprocessed/, committed (not used here)
-├── cache/                            files the scripts build
 └── zenodo_1167595/
     ├── P1_AIS_Data/
-    │   ├── nari_dynamic.csv          AIS positions             tutorials 1, 2
-    │   ├── nari_static.csv           vessel static data        tutorial 1
-    │   └── README_parameters.txt     field descriptions        tutorial 1
+    │   ├── nari_dynamic.csv          AIS positions
+    │   ├── nari_static.csv           vessel static data (vessel type)
+    │   └── README_parameters.txt     field descriptions
     ├── P1_AIS_Codes/
-    │   └── Ship Types List.csv       ship type code -> name    tutorial 1   (+ 5 other code tables)
+    │   └── Ship Types List.csv       ship type code -> name    (+ 5 other code tables)
     ├── E2_Weather_Conditions/
     │   ├── table_wheatherObservation.csv   hourly observations (the misspelling is the archive's)
     │   ├── table_weatherStation.csv        station positions
-    │   └── README_parameters.txt           field descriptions        tutorial 1
+    │   └── README_parameters.txt           field descriptions
     ├── E1_ocean/
-    │   ├── oc_february.csv           sea state, Feb 2016       tutorial 2
+    │   ├── oc_<month>.csv            sea state, one file per month (--months)
     │   └── README_parameters.txt
     ├── C2_European_Coastline/
-    │   ├── Europe Coastline (Polygone).shp   (+ .shx .dbf .prj)  land polygons   tutorial 3 (optional section)
+    │   ├── Europe Coastline (Polygone).shp   (+ .shx .dbf .prj)  land polygons
     │   └── README_parameters.txt
     └── preprocessed/                 written by scripts/prepare_zenodo.py (section 5); not committed
-        ├── AIS/ais.parquet           AIS, descriptive names, filtered     tutorials 1, 2
-        ├── Ocean/ocean_<month>.parquet  sea state, one file per month     tutorial 2
-        ├── Weather/weather.parquet   observations + station positions     tutorial 1
-        ├── Coastline/coastline.parquet  land polygons, EPSG:32630         tutorial 3
+        ├── AIS/ais.parquet           AIS, descriptive names, filtered, with vessel type
+        ├── Ocean/ocean_<month>.parquet  sea state, one file per month (not January)
+        ├── Weather/weather.parquet   observations + station positions
+        ├── Coastline/coastline.parquet  land polygons, EPSG:32630
         └── preprocessing_report.csv, .txt
 ```
 
@@ -232,24 +251,27 @@ data/
 
 | step | command | reads | writes |
 |---|---|---|---|
-| 0 | `python scripts/prepare_zenodo.py` (needs `pyarrow`) | the raw CSVs from the download | `data/zenodo_1167595/preprocessed/`: columns renamed, "not available" codes as NaN, ranges checked, projected to EPSG:32630, noise removed |
-| 1 | open `notebooks/01_trajectory_annotation.ipynb`, keep `SOURCE = "auto"` (or `"zenodo"`), run all | `preprocessed/AIS/ais.parquet`, `preprocessed/Weather/weather.parquet` | `results/01_trajectory_annotation/`, including `06_fleet_annotated.parquet` (~1 GB) when `EXPORT_FLEET = True` |
-| 2 | `python scripts/cadp_on_annotated_fleet.py` | `06_fleet_annotated.parquet` from step 1 | `results/02_cadp_compression/` |
-| 3 | open `notebooks/02_cadp_compression.ipynb`, run all | `preprocessed/AIS/ais.parquet`, `preprocessed/Ocean/ocean_february.parquet` | figures and tables inline |
+| 0 | `python scripts/prepare_zenodo.py --n-jobs -1` (needs `pyarrow`), or notebook `01_preprocessing` with `PREPROCESS_FULL = True` | the raw CSVs from the download | `data/zenodo_1167595/preprocessed/`: columns renamed, "not available" codes as NaN, ranges checked, projected to EPSG:32630, noise removed |
+| 1 | notebook `02_trajectory_annotation`, `DATA = "full"` | `preprocessed/` (AIS, weather, sea state, coastline) | `results/02_trajectory_annotation/full/` |
+| 2 | notebook `03_two_stage_cpls_compression`, `DATA = "full"` | `preprocessed/AIS`, `preprocessed/Coastline` | `results/03_two_stage_cpls_compression/full/` |
+| 3 | notebook `04_cadp_compression`, `DATA = "full"` | `preprocessed/AIS`, `preprocessed/Ocean` | `results/04_cadp_compression/full/` |
+| 4 | notebook `05_clstm_prediction`, `DATA = "full"` | the output of step 2 | `results/05_clstm_prediction/full/` |
 
-Steps 1 and 3 depend on step 0; step 2 depends on step 1.
+Steps 1 to 4 depend on step 0; step 4 also depends on step 2. Steps 1 to 3 are
+independent of each other. Set `DATA` in the notebook's settings cell, or run it
+with `CATRAJ_DATA=full` (see "Running the notebooks" in the main README).
 
 Step 0 skips outputs that exist (`--force` rebuilds them), skips datasets that
-were not downloaded, and takes a few minutes for the full AIS file. It median-filters
-over `--window` seconds (default 30): this changes the AIS positions, speed,
-course and heading, and leaves the hourly weather and the 3-hourly sea state as
-they are, so every column the notebooks use goes through the same step.
+were not downloaded, and takes about two minutes for the whole archive (19
+million AIS messages; the measurements are in notebook `01_preprocessing`,
+Part 3). It median-filters over `--window` seconds (default 30): this changes
+the AIS positions, speed, course and heading, and leaves the hourly weather and
+the 3-hourly sea state as they are, so every column the notebooks use goes
+through the same step.
 
-Tutorial 1 reads the whole archive by default (`WINDOW` covers all six months,
-and `MAX_VESSELS = None` takes every vessel). Loading `nari_dynamic.csv` in
-full needs several GB of memory. On a smaller machine, narrow `WINDOW` to a
-few days or set `MAX_VESSELS`. Step 2 then processes whatever tutorial 1
-exported.
+The full runs use the whole archive (five months, 14.9 million positions after
+preprocessing). Loading it needs several GB of memory; on a smaller machine run
+the notebooks on the sample.
 
 ---
 
@@ -263,9 +285,10 @@ exported.
 | Zenodo returns an error, e.g. 429 *Too Many Requests* or 5xx | wait a few minutes and run the script again |
 | a notebook says the preprocessed files are missing | run `python scripts/prepare_zenodo.py` (after the download) |
 | `prepare_zenodo.py` says pyarrow is needed | `pip install pyarrow` (or `pip install -e .[data]`) |
-| a notebook raises `FileNotFoundError: missing: data/...` | the file is not where section 4 says; run `python scripts/download_data.py --check` |
-| `scripts/cadp_on_annotated_fleet.py` says the Parquet file is missing | run tutorial 1 with the full archive and `EXPORT_FLEET = True` first (section 5) |
-| out of disk space | extract only what you need (`annotation` or `cadp`), add `--remove-zips`, and keep `--months feb` |
+| a notebook raises `FileNotFoundError: missing: data/...` | the file is not where section 4 says; run `python scripts/download_data.py --check --months all` |
+| `scripts/cadp_on_annotated_fleet.py` says the Parquet file is missing | that script reads the output of an earlier annotation notebook; notebook `04_cadp_compression` replaces it (`scripts/README.md`) |
+| notebook `05` says the output of notebook `03` is missing | run notebook `03` with the same `DATA` first |
+| out of disk space | add `--remove-zips`; work on the sample, which needs no download at all |
 
 ---
 
