@@ -11,7 +11,6 @@ they ran on (`sample` or `full`, the `DATA` setting):
 | `02_trajectory_annotation/<DATA>/` | `notebooks/02_trajectory_annotation.ipynb` | `annotated_ais.parquet` (every position with its weather and sea-state context), `vessel_summary.csv`, `annotation_timing.csv`, the cross-validation tables, `figures/` (interactive `.html` and `.png`) |
 | `03_two_stage_cpls_compression/<DATA>/` | `notebooks/03_two_stage_cpls_compression.ipynb` | `trips_ais.parquet` (the trips), `compressed_ais.parquet` (their 2stage-CPLS output), `summary.csv` (per vessel type) |
 | `04_cadp_compression/<DATA>/` | `notebooks/04_cadp_compression.ipynb` | `compressed_ais_<context>.parquet` (depth, wave height, wave direction, combined), `context_fidelity.csv`, `summary.csv` |
-| `05_clstm_prediction/<DATA>/` | `notebooks/05_clstm_prediction.ipynb` | the trained networks (`.pt`), `errors.csv`, `summary.txt`; reads the output of folder 03 |
 | `03_app_exports/` | the annotation app's Export button | GeoPackage, CSV and score tables |
 | `02_cadp_compression/` | `scripts/cadp_on_annotated_fleet.py` (see `scripts/README.md`) | the CADP-compressed fleet in both modes, a per-vessel table and a summary |
 

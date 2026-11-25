@@ -255,10 +255,8 @@ data/
 | 1 | notebook `02_trajectory_annotation`, `DATA = "full"` | `preprocessed/` (AIS, weather, sea state, coastline) | `results/02_trajectory_annotation/full/` |
 | 2 | notebook `03_two_stage_cpls_compression`, `DATA = "full"` | `preprocessed/AIS`, `preprocessed/Coastline` | `results/03_two_stage_cpls_compression/full/` |
 | 3 | notebook `04_cadp_compression`, `DATA = "full"` | `preprocessed/AIS`, `preprocessed/Ocean` | `results/04_cadp_compression/full/` |
-| 4 | notebook `05_clstm_prediction`, `DATA = "full"` | the output of step 2 | `results/05_clstm_prediction/full/` |
 
-Steps 1 to 4 depend on step 0; step 4 also depends on step 2. Steps 1 to 3 are
-independent of each other. Set `DATA` in the notebook's settings cell, or run it
+Steps 1 to 3 depend on step 0 and are independent of each other. Set `DATA` in the notebook's settings cell, or run it
 with `CATRAJ_DATA=full` (see "Running the notebooks" in the main README).
 
 Step 0 skips outputs that exist (`--force` rebuilds them), skips datasets that

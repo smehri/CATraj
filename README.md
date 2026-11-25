@@ -74,9 +74,8 @@ The notebooks run live on [Binder](https://mybinder.org) with no install and no 
 | `02_trajectory_annotation` | Annotate every vessel with weather and sea state, on the sample and on the full archive. | [![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/smehri/CATraj/main?labpath=notebooks%2F02_trajectory_annotation.ipynb) | [nbviewer](https://nbviewer.org/github/smehri/CATraj/blob/main/notebooks/02_trajectory_annotation.ipynb) | [`full_runs/02_trajectory_annotation.ipynb`](notebooks/full_runs/02_trajectory_annotation.ipynb) |
 | `03_two_stage_cpls_compression` | Compress every trip of every vessel with 2stage-CPLS, keeping the coastline constraint. | [![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/smehri/CATraj/main?labpath=notebooks%2F03_two_stage_cpls_compression.ipynb) | [nbviewer](https://nbviewer.org/github/smehri/CATraj/blob/main/notebooks/03_two_stage_cpls_compression.ipynb) | [`full_runs/03_two_stage_cpls_compression.ipynb`](notebooks/full_runs/03_two_stage_cpls_compression.ipynb) |
 | `04_cadp_compression` | CADP compression of every trip, driven by the sea state (depth, wave height, wave direction). | [![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/smehri/CATraj/main?labpath=notebooks%2F04_cadp_compression.ipynb) | [nbviewer](https://nbviewer.org/github/smehri/CATraj/blob/main/notebooks/04_cadp_compression.ipynb) | [`full_runs/04_cadp_compression.ipynb`](notebooks/full_runs/04_cadp_compression.ipynb) |
-| `05_clstm_prediction` | CLSTM trajectory prediction (PyTorch), trained on the clean trips and on the 2stage-CPLS output of notebook 03. | [![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/smehri/CATraj/main?labpath=notebooks%2F05_clstm_prediction.ipynb) | [nbviewer](https://nbviewer.org/github/smehri/CATraj/blob/main/notebooks/05_clstm_prediction.ipynb) | [`full_runs/05_clstm_prediction.ipynb`](notebooks/full_runs/05_clstm_prediction.ipynb) |
 
-The notebooks in `notebooks/` run on the sample. [`notebooks/full_runs/`](notebooks/full_runs/) holds copies of notebooks 02 to 05 executed on the full archive, outputs kept, so the numbers of the whole archive can be read without rerunning anything (notebook 01 covers the full archive in its own later parts).
+The notebooks in `notebooks/` run on the sample. [`notebooks/full_runs/`](notebooks/full_runs/) holds copies of notebooks 02 to 04 executed on the full archive, outputs kept, so the numbers of the whole archive can be read without rerunning anything (notebook 01 covers the full archive in its own later parts).
 
 Binder offers about 2 GB of RAM and one or two CPUs, so it is meant for the sample only. The full-archive runs (several GB of downloads) are not meant for Binder: run them locally, see [`docs/getting_the_data.md`](docs/getting_the_data.md).
 
@@ -86,16 +85,15 @@ Binder offers about 2 GB of RAM and one or two CPUs, so it is meant for the samp
 
 **Locally**: create the environment, either `pip install -e ".[dev]"` (see [Installation](#installation); `dev` adds the app, MovingPandas, pyarrow and PyTorch to the library) or `conda env create -f binder/environment.yml` followed by `pip install -e .`. Then open the notebooks in JupyterLab or VS Code with that environment as the kernel.
 
-Two settings at the top of notebooks 02 to 05 choose what they run on; each reads an environment variable, so a notebook can be switched without editing it:
+Two settings at the top of notebooks 02 to 04 choose what they run on; each reads an environment variable, so a notebook can be switched without editing it:
 
 | setting | environment variable | meaning |
 |---|---|---|
 | `DATA` | `CATRAJ_DATA` | `"sample"` (default) or `"full"`; the results go to `results/<notebook>/<DATA>/` |
 | `N_JOBS` | `CATRAJ_N_JOBS` | worker processes; `-1` (default) uses every core, `1` is serial |
 
-Notebook 05 also has `DEVICE` (`CATRAJ_DEVICE`, `"auto"` uses a GPU when there is one, `"cpu"` forces the CPU).
 
-Run them in order, 01 to 05. Notebooks 02, 03 and 04 are independent of each other; **05 reads what 03 wrote** (`results/03_two_stage_cpls_compression/<DATA>/`), so run 03 with the same `DATA` first. **The full archive needs notebook 01 first**: set `DOWNLOAD = True` and `PREPROCESS_FULL = True` there (or run `scripts/download_data.py --months all` and `scripts/prepare_zenodo.py`, see [`docs/getting_the_data.md`](docs/getting_the_data.md)), then run 02 to 05 with `DATA = "full"`.
+Run them in order, 01 to 04. Notebooks 02, 03 and 04 are independent of each other. **The full archive needs notebook 01 first**: set `DOWNLOAD = True` and `PREPROCESS_FULL = True` there (or run `scripts/download_data.py --months all` and `scripts/prepare_zenodo.py`, see [`docs/getting_the_data.md`](docs/getting_the_data.md)), then run 02 to 04 with `DATA = "full"`.
 
 From the command line:
 
@@ -124,7 +122,6 @@ table for the sample.
 | `02_trajectory_annotation` | all 14,906,535 positions of 4,720 vessels annotated with all eight variables (wind speed, air temperature, air pressure, wind direction, sea level, wave height, wave length, wave direction), none missing; 197 s in total (`annotation_timing.csv`) |
 | `03_two_stage_cpls_compression` | 2stage-CPLS, ε 1 km, 1.54 m/s, stays of 100 m and 600 s, coastline as barrier: 14,777,418 points of 19,407 trips (2,076 vessels) become 1,636,505, a compression of 88.9 % (21,470 of the kept points are stay points); 270 s |
 | `04_cadp_compression` | CADP, one context at a time, on the same trips (points kept of 14,777,418): Douglas–Peucker alone 71,165 (99.5 %); depth 114,940 (99.2 %); wave height 4,836,798 (67.3 %); wave direction 8,306,633 (43.8 %); all three together 9,301,789 (37.1 %). `context_fidelity.csv` gives how far the dropped points' context lies from the compressed track |
-| `05_clstm_prediction` | Curvilinear model, LSTM and CLSTM (one network per vessel type; the network learns the deviation from the curvilinear prediction), trained once on the clean trips and once on their 2stage-CPLS output, tested on the same 20 % of trips (3,867). Mean point-wise error, clean data (2,690,936 test samples): curvilinear 17.6 m, LSTM 25.3 m, CLSTM 21.2 m — CLSTM is 16.2 % better than the LSTM, but neither network beats the curvilinear model. 2stage-CPLS data (294,940 test samples, larger time step): curvilinear 811.9 m, LSTM 564.0 m, CLSTM 603.1 m — both networks beat the curvilinear model, CLSTM is 6.9 % worse than the LSTM. GPU (RTX 4060 Ti), 48 min of training. Not a reproduction of the paper's 15.68 %: other data, period and vessel types |
 
 ---
 
@@ -387,7 +384,7 @@ them; point it at your own data and the question does not arise.
 
 The sample is cut from a public six-month archive (October 2015 – March 2016)
 on Zenodo, [doi:10.5281/zenodo.1167595](https://doi.org/10.5281/zenodo.1167595)
-(Ray et al., 2019). The full-archive runs of notebooks 02 to 05 use it, after
+(Ray et al., 2019). The full-archive runs of notebooks 02 to 04 use it, after
 preprocessing. They cover October to December 2015 and February to March 2016:
 **January 2016 is excluded everywhere**, because the archive's `oc_january.csv`
 is a copy of `oc_november.csv`, so January's positions cannot be given a sea

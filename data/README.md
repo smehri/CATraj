@@ -72,7 +72,6 @@ land = load_coastline()
 | `notebooks/02_trajectory_annotation.ipynb` (`DATA = "sample"`) | `preprocessed/AIS`, `Weather`, `Ocean`, `Coastline` |
 | `notebooks/03_two_stage_cpls_compression.ipynb` | `preprocessed/AIS`, `preprocessed/Coastline` |
 | `notebooks/04_cadp_compression.ipynb` | `preprocessed/AIS`, `preprocessed/Ocean`, `preprocessed/Coastline` |
-| `notebooks/05_clstm_prediction.ipynb` | the output of notebook 03 (itself made from `preprocessed/AIS`, `Coastline`) |
 | `notebooks/01_preprocessing.ipynb` | `raw/` (every step of the preprocessing, on the sample) |
 | `app/` (the annotation app) | `preprocessed/AIS`, `preprocessed/Weather` |
 | `tests/` (tests marked `data`) | `preprocessed/` (all four), `raw/E2_Weather_Conditions/README_parameters.txt` |
@@ -117,7 +116,6 @@ step in
 | `notebooks/02_trajectory_annotation.ipynb` (`DATA = "full"`) | `preprocessed/AIS`, `Weather`, `Ocean` (five months), `Coastline` |
 | `notebooks/03_two_stage_cpls_compression.ipynb` (`DATA = "full"`) | `preprocessed/AIS/ais.parquet`, `preprocessed/Coastline/coastline.parquet` |
 | `notebooks/04_cadp_compression.ipynb` (`DATA = "full"`) | `preprocessed/AIS`, `Ocean` (five months), `Coastline` |
-| `notebooks/05_clstm_prediction.ipynb` (`DATA = "full"`) | the full-archive output of notebook 03 |
 
 ## Licences
 

@@ -109,3 +109,7 @@ results/*
 # The sample datasets the tutorials, tests and app depend on.
 !data/sample/
 !data/sample/**
+
+# CLSTM notebook and its results: kept local until the owner publishes them.
+notebooks/05_clstm_prediction.ipynb
+notebooks/full_runs/05_clstm_prediction.ipynb
