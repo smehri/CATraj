@@ -1,0 +1,389 @@
+import geopandas as gpd
+import numpy as np
+import pandas as pd
+import pytest
+
+from catraj.prediction.clstm import (
+    PredictionSamples,
+    make_samples,
+    prediction_errors,
+    split_by_trajectory,
+)
+from catraj.prediction.curvilinear import KNOT, curvilinear_predict
+
+
+# ------------------------------------------------------------- fixtures
+
+
+def _frame(t, x, y, sog, cog, vessel_type=None, ident=None, crs=32630):
+    t = np.asarray(t, dtype=float)
+    data = {"t": t, "sog": sog, "cog": cog}
+    if vessel_type is not None:
+        data["type"] = vessel_type
+    if ident is not None:
+        data["id"] = ident
+    return gpd.GeoDataFrame(
+        data, geometry=gpd.points_from_xy(x, y), crs=crs
+    )
+
+
+def _straight(n=7, kind="Cargo", ident="a", t0=0.0, y=0.0):
+    t = t0 + 10.0 * np.arange(n)
+    return _frame(t, 10.0 * np.arange(n), np.full(n, y), 1 / KNOT, 90.0,
+                  vessel_type=kind, ident=ident)
+
+
+def _make(df, **kw):
+    kw.setdefault("speed_column", "sog")
+    kw.setdefault("course_column", "cog")
+    kw.setdefault("time_column", "t")
+    return make_samples(df, **kw)
+
+
+# --------------------------------------------------------------- samples
+
+
+def test_make_samples_hand_worked():
+    df = _straight()
+    s = _make(df, context_column="type", by="id")
+    assert isinstance(s, PredictionSamples)
+    assert len(s) == 4  # origin 4 would need t = 70
+    assert s.inputs.shape == (4, 3, 3) and s.targets.shape == (4, 3, 2)
+    assert s.inputs.dtype == s.targets.dtype == np.float64
+    np.testing.assert_array_equal(s.dt, 10.0)
+    np.testing.assert_array_equal(s.time, [0, 10, 20, 30])
+    np.testing.assert_array_equal(s.origin, [[0, 0], [10, 0], [20, 0], [30, 0]])
+    for k in range(4):
+        np.testing.assert_allclose(s.inputs[k, :, 0], 10.0 * k + np.array([10, 20, 30]),
+                                   atol=1e-9)
+        np.testing.assert_allclose(s.inputs[k, :, 1], 0, atol=1e-9)
+        np.testing.assert_array_equal(s.inputs[k, :, 2], [10, 20, 30])
+    np.testing.assert_allclose(s.targets[..., 0], s.inputs[..., 0], atol=1e-9)
+    np.testing.assert_allclose(s.targets[..., 1], s.inputs[..., 1], atol=1e-9)
+    np.testing.assert_allclose(s.curvilinear, s.inputs[..., :2])
+    assert list(s.group) == ["Cargo"] * 4 and list(s.trajectory) == ["a"] * 4
+
+    # Bend the track: y jumps by 5 m at t >= 30.  The inputs still follow SOG
+    # and COG from each origin (origin 3 now sits at y = 5); the targets bend.
+    bent = df.copy()
+    bent["geometry"] = gpd.points_from_xy(
+        10.0 * np.arange(7), [0, 0, 0, 5, 5, 5, 5]
+    )
+    b = _make(bent)
+    np.testing.assert_allclose(b.inputs[..., 0], s.inputs[..., 0], atol=1e-9)
+    np.testing.assert_allclose(b.inputs[..., 2], s.inputs[..., 2], atol=1e-9)
+    np.testing.assert_allclose(
+        b.inputs[..., 1], [[0] * 3, [0] * 3, [0] * 3, [5] * 3], atol=1e-9
+    )
+    np.testing.assert_allclose(b.targets[..., 0], s.targets[..., 0], atol=1e-9)
+    np.testing.assert_allclose(
+        b.targets[..., 1], [[0, 0, 5], [0, 5, 5], [5, 5, 5], [5, 5, 5]], atol=1e-9
+    )
+
+
+def test_targets_are_interpolated_in_time():
+    # Eq. 12: dt = 40 / 3; the epochs 13.33, 26.67 and 40 fall between vertices.
+    df = _frame([0, 10, 30, 40], [0, 10, 30, 40], [0, 10, 0, 10], 1.0, 90.0)
+    s = _make(df, speed_unit="native")
+    assert len(s) == 1
+    np.testing.assert_allclose(s.dt, 40 / 3)
+    dt = 40 / 3
+    np.testing.assert_allclose(s.targets[0, :, 0], [dt, 2 * dt, 40], atol=1e-9)
+    np.testing.assert_allclose(
+        s.targets[0, :, 1], [10 - 10 * (dt - 10) / 20, 10 * (30 - 2 * dt) / 20, 10],
+        atol=1e-9,
+    )
+    np.testing.assert_allclose(s.inputs[0, :, 2], [dt, 2 * dt, 3 * dt])
+
+
+def test_speed_unit_and_steps_and_duplicate_times():
+    df = _straight()
+    native = _make(df, speed_unit="native")
+    np.testing.assert_allclose(native.inputs[0, :, 0], np.array([1, 2, 3]) * 10 / KNOT)
+    s5 = _make(df, steps=2)
+    assert s5.inputs.shape == (5, 2, 3) and s5.targets.shape == (5, 2, 2)
+    with pytest.raises(ValueError, match="speed_unit"):
+        _make(df, speed_unit="mph")
+
+    # A repeated timestamp keeps its first row.
+    dup = pd.concat([df.iloc[:3], df.iloc[2:3].assign(sog=99.0), df.iloc[3:]])
+    dup = dup.reset_index(drop=True)
+    a, b = _make(dup), _make(df)
+    np.testing.assert_allclose(a.inputs, b.inputs)
+    np.testing.assert_allclose(a.targets, b.targets)
+
+
+def test_unavailable_speed_or_course_drops_the_sample():
+    df = _straight()
+    df["sog"] = [102.3, 1 / KNOT, np.nan, 1 / KNOT, 1 / KNOT, 1 / KNOT, 1 / KNOT]
+    s = _make(df)
+    np.testing.assert_array_equal(s.time, [10, 30])
+
+    df = _straight()
+    df["cog"] = [90.0, 360.0, 90.0, np.nan, 90.0, 90.0, 90.0]
+    s = _make(df)
+    np.testing.assert_array_equal(s.time, [0, 20])
+
+    # The rows stay usable as targets: dt is the trajectory's.
+    np.testing.assert_array_equal(s.dt, 10.0)
+    np.testing.assert_allclose(s.targets[1, :, 0], [30, 40, 50], atol=1e-9)
+
+
+def test_short_or_degenerate_trajectories_give_no_samples():
+    one = _straight(n=1)
+    flat = _frame([5, 5, 5], [0, 1, 2], [0, 0, 0], 1.0, 90.0)
+    short = _straight(n=3)  # origin 0 would need t = 30 > 20
+    for df in (one, flat, short):
+        s = _make(df)
+        assert len(s) == 0
+        assert s.inputs.shape == (0, 3, 3) and s.targets.shape == (0, 3, 2)
+
+
+def test_null_type_becomes_other():
+    a = _straight(kind=None, ident="a")
+    b = _straight(kind="", ident="b")
+    c = _straight(kind=pd.Categorical([None] * 7, categories=["Tug"]), ident="c")
+    d = _straight(kind="Tug", ident="d")
+    s = _make(pd.concat([a, b, c, d]), context_column="type", by="id")
+    assert list(s.group) == ["Other"] * 12 + ["Tug"] * 4
+
+    # Categorical with values becomes str.
+    e = _straight(kind=pd.Categorical(["Tug"] * 7), ident="e")
+    s = _make(e, context_column="type")
+    assert list(s.group) == ["Tug"] * 4 and s.group.dtype == object
+
+
+def test_types_follow_the_trajectory():
+    a = _straight(kind="Cargo", ident="a")
+    b = _straight(kind="Tug", ident="b", t0=1000.0, y=50.0)
+    s = _make(pd.concat([a, b]), context_column="type", by="id")
+    assert list(s.group) == ["Cargo"] * 4 + ["Tug"] * 4
+    assert list(s.trajectory) == ["a"] * 4 + ["b"] * 4
+
+    # A type that is not constant: the most frequent non-null value.
+    mixed = _straight(ident="m")
+    mixed["type"] = ["Tug", None, "Cargo", "Cargo", "Tug", "Cargo", None]
+    s = _make(mixed, context_column="type")
+    assert set(s.group) == {"Cargo"}
+
+    # No context column: one group.
+    assert set(_make(a).group) == {"all"}
+
+
+def _two_frames():
+    a = _straight(kind="Cargo", ident="a")
+    b = _straight(n=9, kind="Tug", ident="b", t0=1000.0, y=50.0)
+    b["cog"] = 45.0
+    return a, b
+
+
+def _assert_same(p, q):
+    for name in ("inputs", "targets", "origin", "time", "dt"):
+        np.testing.assert_allclose(getattr(p, name), getattr(q, name), atol=1e-9)
+    assert list(p.group) == list(q.group)
+    assert list(p.trajectory) == list(q.trajectory)
+
+
+def test_make_samples_accepts_every_form():
+    a, b = _two_frames()
+    both = pd.concat([a, b])
+    ref = _make(both, context_column="type", by="id")
+    assert len(ref) == 4 + 6 and list(ref.trajectory) == ["a"] * 4 + ["b"] * 6
+
+    # Time from a DatetimeIndex instead of a column.
+    dated = both.set_index(pd.to_datetime(both["t"], unit="s")).drop(columns="t")
+    _assert_same(
+        make_samples(dated, speed_column="sog", course_column="cog",
+                     context_column="type", by="id"),
+        ref,
+    )
+    # The same, with the index and no ``by``: one trajectory per call.
+    only_a = make_samples(
+        dated[dated["id"] == "a"], speed_column="sog", course_column="cog",
+        context_column="type",
+    )
+    assert len(only_a) == 4 and list(only_a.group) == ["Cargo"] * 4
+
+
+@pytest.mark.movingpandas
+def test_make_samples_accepts_movingpandas_objects():
+    mpd = pytest.importorskip("movingpandas")
+    a, b = _two_frames()
+    both = pd.concat([a, b])
+    ref = _make(both, context_column="type", by="id")
+
+    def traj(df, ident):
+        df = df.set_index(pd.to_datetime(df["t"], unit="s")).drop(columns="t")
+        return mpd.Trajectory(df, ident)
+
+    ta, tb = traj(a, "a"), traj(b, "b")
+    kw = dict(speed_column="sog", course_column="cog", context_column="type")
+    _assert_same(make_samples(mpd.TrajectoryCollection([ta, tb]), **kw), ref)
+
+    single = make_samples(ta, **kw)
+    assert list(single.trajectory) == ["a"] * 4
+    _assert_same(single, ref.subset(np.arange(4)))
+    # time_column works on a Trajectory too.
+    tc = mpd.Trajectory(
+        a.set_index(pd.to_datetime(a["t"], unit="s")), "a"
+    )
+    _assert_same(make_samples(tc, time_column="t", **kw), single)
+
+
+def test_make_samples_refuses_geographic_coordinates():
+    df = _straight().set_crs(32630, allow_override=True).to_crs(4326)
+    with pytest.raises(ValueError, match="geographic"):
+        _make(df)
+
+
+def test_make_samples_names_a_missing_column():
+    df = _straight()
+    with pytest.raises(KeyError, match="sog"):
+        _make(df.drop(columns="sog"))
+    with pytest.raises(KeyError, match="cog"):
+        _make(df.drop(columns="cog"))
+    with pytest.raises(KeyError, match="kind"):
+        _make(df, context_column="kind")
+    with pytest.raises(KeyError, match="trip"):
+        _make(df, by="trip")
+    with pytest.raises(KeyError, match="when"):
+        _make(df, time_column="when")
+
+
+def test_decreasing_times_are_refused():
+    df = _frame([0, 10, 5, 20], [0, 1, 2, 3], [0, 0, 0, 0], 1.0, 90.0)
+    with pytest.raises(ValueError, match="decrease"):
+        _make(df)
+
+
+# ---------------------------------------------------------------- split
+
+
+def _fleet(n=10, per=7):
+    return PredictionSamples.concat([
+        _make(_straight(n=per + 3, ident=f"v{i}", t0=1000.0 * i,
+                        kind="Cargo" if i % 2 else "Tug"),
+              context_column="type", by="id")
+        for i in range(n)
+    ])
+
+
+def test_concat_and_subset():
+    a, b = _two_frames()
+    sa = _make(a, context_column="type")
+    sb = _make(b, context_column="type")
+    both = PredictionSamples.concat([sa, sb])
+    assert len(both) == len(sa) + len(sb)
+    np.testing.assert_array_equal(both.subset(np.arange(len(sa))).inputs, sa.inputs)
+    mask = np.zeros(len(both), dtype=bool)
+    mask[-2:] = True
+    np.testing.assert_array_equal(both.subset(mask).targets, sb.targets[-2:])
+    assert len(both.subset([])) == 0
+    with pytest.raises(ValueError):
+        PredictionSamples.concat([])
+
+
+def test_split_keeps_trajectories_whole():
+    samples = _fleet(n=10)
+    train, test = split_by_trajectory(samples, test_size=0.2, seed=3)
+    assert set(train.trajectory).isdisjoint(set(test.trajectory))
+    assert len(train) + len(test) == len(samples)
+    assert len(set(test.trajectory)) == 2 and len(set(train.trajectory)) == 8
+    for ident in set(samples.trajectory):
+        side = train if ident in set(train.trajectory) else test
+        assert (side.trajectory == ident).sum() == (samples.trajectory == ident).sum()
+
+    again = split_by_trajectory(samples, test_size=0.2, seed=3)
+    assert list(again[1].trajectory) == list(test.trajectory)
+    other = {s for s in range(20)
+             if set(split_by_trajectory(samples, 0.2, s)[1].trajectory)
+             != set(test.trajectory)}
+    assert other  # the seed matters
+
+
+def test_split_matches_the_rule_in_the_brief():
+    samples = _fleet(n=10)
+    ids = list(dict.fromkeys(samples.trajectory))
+    rng = np.random.default_rng(7)
+    order = list(ids)
+    rng.shuffle(order)
+    _, test = split_by_trajectory(samples, test_size=0.3, seed=7)
+    assert set(test.trajectory) == set(order[:3])
+
+
+def test_split_clamps_and_refuses():
+    samples = _fleet(n=3)
+    _, test = split_by_trajectory(samples, test_size=0.0)
+    assert len(set(test.trajectory)) == 1
+    train, _ = split_by_trajectory(samples, test_size=0.99)
+    assert len(set(train.trajectory)) == 1
+    with pytest.raises(ValueError):
+        split_by_trajectory(_fleet(n=1))
+
+
+# --------------------------------------------------------------- errors
+
+
+def _scoring_samples():
+    targets = np.zeros((4, 3, 2))
+    return PredictionSamples(
+        inputs=np.zeros((4, 3, 3)), targets=targets, origin=np.zeros((4, 2)),
+        time=np.arange(4.0), dt=np.ones(4),
+        group=np.array(["A", "A", "B", "B"], dtype=object),
+        trajectory=np.array(["a", "a", "b", "b"], dtype=object),
+    )
+
+
+def test_prediction_errors_matches_eq_25():
+    s = _scoring_samples()
+    pred = np.zeros((4, 3, 2))
+    pred[0, :, 0] = [3, 0, 0]          # distance 3 at t+1
+    pred[0, :, 1] = [4, 0, 0]          # ... now 5
+    pred[1, 1] = [6, 8]                # distance 10 at t+2
+    pred[2, 2] = [0, 2]                # distance 2 at t+3
+    pred[3] = np.nan                   # missing
+    table = prediction_errors(pred, s)
+    assert list(table.index) == ["A", "B", "all"]
+    assert list(table.columns) == [
+        "samples", "missing", "rmse", "rmse_t+1", "rmse_t+2", "rmse_t+3",
+        "mean_error", "median_error",
+    ]
+    a = table.loc["A"]
+    assert a["samples"] == 2 and a["missing"] == 0
+    d = np.array([5, 0, 0, 0, 10, 0.0])
+    assert a["rmse"] == pytest.approx(np.sqrt((d ** 2).sum() / 6))
+    assert a["rmse_t+1"] == pytest.approx(np.sqrt(25 / 2))
+    assert a["rmse_t+2"] == pytest.approx(np.sqrt(100 / 2))
+    assert a["rmse_t+3"] == 0
+    assert a["mean_error"] == pytest.approx(15 / 6)
+    assert a["median_error"] == 0
+    b = table.loc["B"]
+    assert b["samples"] == 1 and b["missing"] == 1
+    assert b["rmse"] == pytest.approx(np.sqrt(4 / 3))
+    assert b["rmse_t+3"] == pytest.approx(2.0)
+    allrow = table.loc["all"]
+    assert allrow["samples"] == 3 and allrow["missing"] == 1
+    d_all = np.concatenate([d, [0, 0, 2.0]])
+    assert allrow["rmse"] == pytest.approx(np.sqrt((d_all ** 2).sum() / 9))
+    assert allrow["mean_error"] == pytest.approx(d_all.mean())
+    assert allrow["median_error"] == pytest.approx(np.median(d_all))
+
+
+def test_prediction_errors_scores_the_physical_model_alone():
+    s = _make(_straight(), context_column="type")
+    table = prediction_errors(s.curvilinear, s)
+    assert table.loc["all", "samples"] == 4
+    assert table.loc["all", "rmse"] == pytest.approx(0, abs=1e-9)
+
+    # With a drift of 5 m east at every step the error is exactly 5 m.
+    px, py = curvilinear_predict(s.origin[:, 0], s.origin[:, 1],
+                                 np.ones(4), np.full(4, 90.0), s.dt)
+    off = np.stack([px + 5, py], axis=-1)
+    t = prediction_errors(off, s)
+    assert t.loc["all", "mean_error"] == pytest.approx(5)
+    assert t.loc["all", "rmse"] == pytest.approx(5)
+
+
+def test_prediction_errors_rejects_wrong_shape():
+    with pytest.raises(ValueError, match="shape"):
+        prediction_errors(np.zeros((3, 3, 2)), _scoring_samples())

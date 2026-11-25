@@ -9,6 +9,20 @@ the networks need PyTorch (``pip install catraj[predict]``); importing this
 package does not.
 """
 
+from .clstm import (
+    PredictionSamples,
+    make_samples,
+    prediction_errors,
+    split_by_trajectory,
+)
 from .curvilinear import KNOT, curvilinear_predict, mean_interval
 
-__all__ = ["KNOT", "mean_interval", "curvilinear_predict"]
+__all__ = [
+    "KNOT",
+    "mean_interval",
+    "curvilinear_predict",
+    "PredictionSamples",
+    "make_samples",
+    "split_by_trajectory",
+    "prediction_errors",
+]
