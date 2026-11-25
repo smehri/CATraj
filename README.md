@@ -1,5 +1,7 @@
 # catraj — context-aware trajectory processing
 
+[![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/smehri/CATraj/main?urlpath=lab/tree/notebooks)
+
 Reference implementations of context-aware trajectory algorithms, compatible
 with [MovingPandas](https://github.com/movingpandas/movingpandas).
 
@@ -57,6 +59,22 @@ publisher via the DOI. The implementation does not depend on having them.
 | [`data/`](data/) | all data: the two-day sample in `sample/` (raw and preprocessed), committed; the downloaded archive in `zenodo_1167595/` and built files in `cache/`, not committed |
 | `results/` | everything the notebooks, scripts and app write, not committed ([`README`](results/README.md)) |
 | [`docs/`](docs/) | the source papers (open-access ones) and [`getting_the_data.md`](docs/getting_the_data.md) |
+
+---
+
+## Notebooks
+
+The notebooks run live on [Binder](https://mybinder.org) with no install and no account, on the committed sample (`data/sample/`). github.com does not render the interactive hvplot figures, so use Binder or nbviewer to see them.
+
+| Notebook | Purpose | Run | View | Full-archive run |
+|---|---|---|---|---|
+| `01_preprocessing` | Rename, check and clean the AIS, weather and sea-state files step by step on the sample; downloads and preprocesses the full archive. | [![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/smehri/CATraj/main?labpath=notebooks%2F01_preprocessing.ipynb) | [nbviewer](https://nbviewer.org/github/smehri/CATraj/blob/main/notebooks/01_preprocessing.ipynb) | this notebook covers the full archive itself |
+| `02_trajectory_annotation` | Annotate every vessel with weather and sea state, on the sample and on the full archive. | [![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/smehri/CATraj/main?labpath=notebooks%2F02_trajectory_annotation.ipynb) | [nbviewer](https://nbviewer.org/github/smehri/CATraj/blob/main/notebooks/02_trajectory_annotation.ipynb) | [`full_runs/02_trajectory_annotation.ipynb`](notebooks/full_runs/02_trajectory_annotation.ipynb) |
+| `03_two_stage_cpls_compression` | Compress every trip with 2stage-CPLS, keeping the coastline constraint. | [![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/smehri/CATraj/main?labpath=notebooks%2F03_two_stage_cpls_compression.ipynb) | [nbviewer](https://nbviewer.org/github/smehri/CATraj/blob/main/notebooks/03_two_stage_cpls_compression.ipynb) | [`full_runs/03_two_stage_cpls_compression.ipynb`](notebooks/full_runs/03_two_stage_cpls_compression.ipynb) |
+| `04_cadp_compression` | CADP compression driven by sea state. | [![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/smehri/CATraj/main?labpath=notebooks%2F04_cadp_compression.ipynb) | [nbviewer](https://nbviewer.org/github/smehri/CATraj/blob/main/notebooks/04_cadp_compression.ipynb) | [`full_runs/04_cadp_compression.ipynb`](notebooks/full_runs/04_cadp_compression.ipynb) |
+| `05_clstm_prediction` | CLSTM trajectory prediction (CPU PyTorch). | [![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/smehri/CATraj/main?labpath=notebooks%2F05_clstm_prediction.ipynb) | [nbviewer](https://nbviewer.org/github/smehri/CATraj/blob/main/notebooks/05_clstm_prediction.ipynb) | [`full_runs/05_clstm_prediction.ipynb`](notebooks/full_runs/05_clstm_prediction.ipynb) |
+
+Binder offers about 2 GB of RAM and one or two CPUs, so it is meant for the sample only. The full-archive runs (several GB of downloads) are not meant for Binder: run them locally, see [`docs/getting_the_data.md`](docs/getting_the_data.md).
 
 ---
 
@@ -259,9 +277,7 @@ python app/run_app.py       # or double-click app/"Run Annotation App.bat"
 | | |
 |---|---|
 | [`docs/getting_the_data.md`](docs/getting_the_data.md) | how to download the public archive the tutorials use: one command, by hand, checksums, troubleshooting |
-| [`notebooks/01_trajectory_annotation.ipynb`](notebooks/01_trajectory_annotation.ipynb) | annotation on real data, from the two-day sample up to the whole six-month archive, with interactive plots |
-| [`notebooks/02_cadp_compression.ipynb`](notebooks/02_cadp_compression.ipynb) | CADP on the paper's data (AIS + WAVEWATCH III sea state, Feb 2016): download links and licences, both modes, the paper's experiments |
-| [`notebooks/03_cpls_compression.ipynb`](notebooks/03_cpls_compression.ipynb) | CPLS on the two-day sample and a coastline: where Douglas–Peucker cuts across land, what CPLS adds to prevent it, the choice of ε. No download needed |
+| [Notebooks](#notebooks) | the tutorials, in reading order, with Binder and nbviewer links |
 | [`app/README.md`](app/README.md) | the app |
 | [`scripts/README.md`](scripts/README.md) | scripts that process the whole archive end to end |
 

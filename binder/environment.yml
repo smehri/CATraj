@@ -1,0 +1,27 @@
+# Environment for running the notebooks on mybinder.org (repo2docker reads
+# binder/ before the repository root). CPU only; fits in Binder's ~2 GB RAM
+# when the notebooks use the committed sample.
+name: catraj
+channels:
+  - conda-forge
+dependencies:
+  - python=3.12
+  - numpy
+  - scipy
+  - pandas
+  - geopandas
+  - shapely
+  - pyproj
+  - scikit-learn
+  - cloudpickle
+  - pyarrow
+  - matplotlib
+  - movingpandas
+  - hvplot
+  - holoviews
+  - bokeh
+  - geoviews          # full package: cartopy is needed for geo=True maps in UTM
+  - panel
+  - jupyterlab
+  - ipywidgets
+  - pytorch-cpu

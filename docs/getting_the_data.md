@@ -3,6 +3,11 @@
 This page shows how to get every dataset the tutorials and workflows
 use. Read it before you run anything beyond the two-day sample.
 
+The notebooks also run live on [Binder](https://mybinder.org/v2/gh/smehri/CATraj/main?urlpath=lab/tree/notebooks)
+with nothing to download: the two-day sample is already in the repository. Binder
+has about 2 GB of RAM, so the full-archive runs are not meant for it; download
+the archive and run those locally.
+
 **In short.** Run this from the repository root:
 
 ```bash

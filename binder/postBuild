@@ -1,0 +1,4 @@
+#!/bin/bash
+set -e
+# Install catraj itself from the checkout; every dependency comes from environment.yml.
+pip install --no-deps -e .
