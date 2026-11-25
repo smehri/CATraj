@@ -1,0 +1,12 @@
+-----------------------------------------------------------------------------------------------------
+-- Object : Coastlines
+-- File name : Europe Coastline (Polygone).shp and Europe Coastline.shp (2 shapefiles)
+-- Source : European Environment Agency (https://www.eea.europa.eu)
+-- Dataset version : v. 08/07/2013 (https://www.eea.europa.eu/data-and-maps/data/eea-coastline-for-analysis/gis-data/europe-coastline-shapefile)
+-- SRID : 3035
+-- Coverage : Europe
+-- Volume : NA
+-- Period : NA
+-- Licence :  EEA standard re-use policy: unless otherwise indicated, re-use of content on the EEA website for commercial or non-commercial purposes is permitted free of charge, provided that the source is acknowledged (http://www.eea.europa.eu/legal/copyright). Copyright holder: Directorate-General for Environment (DG ENV).
+-- Description : The shapefiles contain the European Coastline (polylines and polygones). The EEA coastline for analysis is created for highly detailed analysis, e.g. 1:100 000, for geographical Europe. The criteria for defining the coastline is the line separating water from land. The EEA coastline is a product derived from two sources: EU-Hydro and GSHHG.
+-----------------------------------------------------------------------------------------------------

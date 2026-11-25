@@ -1,0 +1,70 @@
+  dataset                       step                                   rule  rows_in  rows_out  rows_dropped  values_to_nan
+      AIS               read_ais_raw                              rows read   239075    239075             0              0
+      AIS          drop_invalid_mmsi mmsi: distress device (SART/MOB/EPIRB)        1         0             1              0
+      AIS          drop_invalid_mmsi                      mmsi: placeholder        1         0             1              0
+      AIS          drop_invalid_mmsi                mmsi: ship station kept   239075    239073             2              0
+      AIS          drop_invalid_time    unix_time inside the archive period   239073    239073             0              0
+      AIS      drop_invalid_position                lon, lat in valid range   239073    239073             0              0
+      AIS      drop_invalid_position           position inside archive area   239073    239073             0              0
+      AIS         unavailable_to_nan       speed_over_ground >= 102.3 (n/a)   239073    239073             0             87
+      AIS         unavailable_to_nan        course_over_ground >= 360 (n/a)   239073    239073             0           1265
+      AIS         unavailable_to_nan          true_heading >= 360 (511 n/a)   239073    239073             0          88599
+      AIS         unavailable_to_nan             rate_of_turn == -128 (n/a)   239073    239073             0              0
+      AIS               check_ranges    speed_over_ground outside 0..<102.3   239073    239073             0              0
+      AIS               check_ranges     course_over_ground outside 0..<360   239073    239073             0              0
+      AIS               check_ranges           true_heading outside 0..<360   239073    239073             0              0
+      AIS               check_ranges         rate_of_turn outside -127..127   239073    239073             0              0
+      AIS               check_ranges   navigational_status not a code 0..15   239073    239073             0              0
+      AIS   drop_duplicates_and_sort            duplicate (mmsi, unix_time)   239073    237320          1753              0
+      AIS        drop_position_jumps           isolated jump above 50 knots   237320    237318             2              0
+      AIS        attach_vessel_types             Unknown: no static message   237318    237318             0           7131
+      AIS        attach_vessel_types        Unknown: code not in type table   237318    237318             0          10209
+      AIS                denoise_ais       median filter, 30 s window; x, y   237318    237318             0              0
+  weather           read_weather_raw                              rows read      768       768             0              0
+  weather weather_unavailable_to_nan              air_temperature == -65536      768       768             0              1
+  weather weather_unavailable_to_nan          min_air_temperature == -65536      768       768             0            714
+  weather weather_unavailable_to_nan          max_air_temperature == -65536      768       768             0            714
+  weather weather_unavailable_to_nan                 air_pressure == -65536      768       768             0              1
+  weather weather_unavailable_to_nan            relative_humidity == -65536      768       768             0              1
+  weather weather_unavailable_to_nan          wind_direction_code == -65536      768       768             0              0
+  weather weather_unavailable_to_nan                   wind_speed == -65536      768       768             0              0
+  weather weather_unavailable_to_nan               max_gust_10min == -65536      768       768             0            743
+  weather weather_unavailable_to_nan                     max_gust == -65536      768       768             0             81
+  weather weather_unavailable_to_nan                   visibility == -65536      768       768             0            215
+  weather weather_unavailable_to_nan                    dew_point == -65536      768       768             0              1
+  weather weather_unavailable_to_nan                precipitation == -65536      768       768             0            744
+  weather weather_unavailable_to_nan         precipitation_period == -65536      768       768             0            206
+  weather     merge_weather_stations               station in station table      768       768             0              0
+  weather          drop_invalid_time    unix_time inside the archive period      768       768             0              0
+  weather       check_weather_ranges        air_temperature outside -90..60      768       768             0              0
+  weather       check_weather_ranges    min_air_temperature outside -90..60      768       768             0              0
+  weather       check_weather_ranges    max_air_temperature outside -90..60      768       768             0              0
+  weather       check_weather_ranges              dew_point outside -90..60      768       768             0              0
+  weather       check_weather_ranges          air_pressure outside 640..820      768       768             0              0
+  weather       check_weather_ranges       relative_humidity outside 0..100      768       768             0              0
+  weather       check_weather_ranges              wind_speed outside 0..120      768       768             0              0
+  weather       check_weather_ranges          max_gust_10min outside 0..120      768       768             0              0
+  weather       check_weather_ranges                max_gust outside 0..120      768       768             0              0
+  weather       check_weather_ranges              visibility outside 0..100      768       768             0              0
+  weather       check_weather_ranges          precipitation outside 0..1000      768       768             0              0
+  weather       check_weather_ranges     precipitation_period outside 0..24      768       768             0              0
+  weather       check_weather_ranges       wind_direction_code not in table      768       768             0              0
+  weather            denoise_weather             median filter, 30 s window      768       768             0              0
+    ocean             read_ocean_raw                              rows read   850860    850860             0              0
+    ocean          drop_invalid_time    unix_time inside the archive period   850860    850860             0              0
+    ocean         drop_invalid_ocean               cell inside archive area   850860    850860             0              0
+    ocean            drop_land_cells       bottom_depth > -16000 (sea cell)   850860    677736        173124              0
+    ocean   ocean_unavailable_to_nan            wave_height < 0 (undefined)   677736    677736             0              0
+    ocean   ocean_unavailable_to_nan            wave_length < 0 (undefined)   677736    677736             0             75
+    ocean   ocean_unavailable_to_nan         wave_direction < 0 (undefined)   677736    677736             0             65
+    ocean   ocean_unavailable_to_nan          sea_level <= -327 (undefined)   677736    677736             0              0
+    ocean         check_ocean_ranges                   bottom_depth > 11000   677736    677736             0              0
+    ocean         check_ocean_ranges              sea_level outside -20..20   677736    677736             0              0
+    ocean         check_ocean_ranges              wave_height outside 0..30   677736    677736             0              0
+    ocean         check_ocean_ranges            wave_length outside 0..2000   677736    677736             0              0
+    ocean         check_ocean_ranges         wave_direction outside 0..<360   677736    677736             0              0
+    ocean                 sort_ocean        sorted by (lon, lat, unix_time)   677736    677736             0              0
+    ocean              denoise_ocean             median filter, 30 s window   677736    677736             0              0
+coastline             read_coastline             polygons touching the area      729       729             0              0
+coastline          project_coastline                          to EPSG:32630      729       729             0              0
+coastline             clip_coastline                    clipped to the area      729       729             0              0

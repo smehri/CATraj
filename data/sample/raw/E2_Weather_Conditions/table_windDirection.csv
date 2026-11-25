@@ -1,0 +1,20 @@
+id_windDirection,DD_num,DD_plainText,DD_shortText
+1,0,Wind blowing from the north,N
+2,22.5,Wind blowing from the north-northeast,NNE
+3,45,Wind blowing from the north-east,NE
+4,67.5,Wind blowing from the east-northeast,ENE
+5,90,Wind blowing from the east,E
+6,112.5,Wind blowing from the east-southeast,ESE
+7,135,Wind blowing from the south-east,SE
+8,157.5,Wind blowing from the south-southeast,SSE
+9,180,Wind blowing from the south,S
+10,202.5,Wind blowing from the south-southwest,SSW
+11,225,Wind blowing from the south-west,SW
+12,247.5,Wind blowing from the west-southwest,WSW
+13,270,Wind blowing from the west,W
+14,292.5,Wind blowing from the west-northwest,WNW
+15,315,Wind blowing from the north-west,NW
+16,337.5,Wind blowing from the north-northwest,NNW
+17,-1,"Calm, no wind",
+18,-1,variable wind direction,
+19,-1,No data available,
