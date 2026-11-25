@@ -1,4 +1,4 @@
-"""Download the public data the tutorials, workflows and benchmarks use.
+"""Download the public data the tutorials and workflows use.
 
 Everything comes from one Zenodo record:
 
@@ -16,7 +16,7 @@ Usage, from the repository root, in the ``catraj`` environment::
 
     python scripts/download_data.py                # everything (~825 MB download)
     python scripts/download_data.py annotation     # tutorial 1 only (~203 MB)
-    python scripts/download_data.py cadp           # tutorial 2 and the benchmarks (~771 MB)
+    python scripts/download_data.py cadp           # tutorial 2 (~771 MB)
     python scripts/download_data.py cpls           # the full coastline for tutorial 3 (~53 MB)
     python scripts/download_data.py --check        # report what is present, download nothing
 
@@ -197,7 +197,7 @@ def main(argv: list[str] | None = None) -> int:
         description="Download the Zenodo data (doi:10.5281/zenodo.1167595) into data/zenodo_1167595/.",
         epilog="Full guide: docs/getting_the_data.md")
     parser.add_argument("target", nargs="?", default="all", choices=sorted(TARGETS),
-                        help="annotation: tutorial 1; cadp: tutorial 2 and the benchmarks; "
+                        help="annotation: tutorial 1; cadp: tutorial 2; "
                              "cpls: the full coastline for tutorial 3; "
                              "all (default): everything")
     parser.add_argument("--months", default="feb",

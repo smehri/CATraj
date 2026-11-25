@@ -52,7 +52,7 @@ publisher via the DOI. The implementation does not depend on having them.
 | [`src/catraj/`](src/catraj/) | the library: `annotation`, `preprocessing`, `compression` |
 | [`tests/`](tests/) | the test suite (`pytest`) |
 | [`notebooks/`](notebooks/) | the tutorials, in reading order |
-| [`scripts/`](scripts/) | command-line scripts: the data downloader, whole-archive workflows, and `benchmarks/` (temporary research scripts, to be removed) |
+| [`scripts/`](scripts/) | command-line scripts: the data downloader and whole-archive workflows |
 | [`app/`](app/) | the interactive annotation app |
 | [`data/`](data/) | all data: the 24-hour sample in `sample/`, committed; the downloaded archive in `zenodo_1167595/` and built files in `cache/`, not committed |
 | `results/` | everything the notebooks, scripts and app write, not committed ([`README`](results/README.md)) |
@@ -296,8 +296,8 @@ them; point it at your own data and the question does not arise.
 
 The sample is cut from a public six-month archive (October 2015 – March 2016)
 on Zenodo, [doi:10.5281/zenodo.1167595](https://doi.org/10.5281/zenodo.1167595)
-(Ray et al., 2019). The full annotation run, the CADP tutorial, the workflows
-and the benchmarks use it, and so does the optional full-coastline section of
+(Ray et al., 2019). The full annotation run, the CADP tutorial
+and the workflows use it, and so does the optional full-coastline section of
 the CPLS tutorial. It is not in the repository. Fetch it with:
 
 ```bash

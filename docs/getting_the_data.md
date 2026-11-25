@@ -1,6 +1,6 @@
 # Getting the data
 
-This page shows how to get every dataset the tutorials, workflows and benchmarks
+This page shows how to get every dataset the tutorials and workflows
 use. Read it before you run anything beyond the 24-hour sample.
 
 **In short.** Run this from the repository root:
@@ -29,11 +29,9 @@ python scripts/prepare_zenodo.py
 |---|---|---|
 | `notebooks/01_trajectory_annotation.ipynb` with the 24-hour sample (`SOURCE = "sample"`) | `data/sample/`, **already in the repository** | none |
 | `app/` (the annotation app) | `data/sample/`, already in the repository | none |
-| `scripts/benchmarks/equal_size_sample_data.py` | `data/sample/`, already in the repository | none |
 | `notebooks/03_cpls_compression.ipynb` | `data/sample/` (AIS and coastline), already in the repository | none |
 | `notebooks/01_trajectory_annotation.ipynb` with the full archive (`SOURCE = "zenodo"`) | AIS data, AIS codes, weather | `download_data.py annotation` (~203 MB) |
 | `notebooks/02_cadp_compression.ipynb` | AIS data, ocean conditions | `download_data.py cadp` (~771 MB) |
-| `scripts/benchmarks/prepare_feb2016.py`, `paper_experiments.py` | AIS data, ocean conditions | `download_data.py cadp` |
 | `scripts/cadp_on_annotated_fleet.py` | the annotated fleet that tutorial 1 writes (section 5 below) | `download_data.py annotation` |
 | the last section of `notebooks/03_cpls_compression.ipynb` (optional: the full coastline) | European coastline | `download_data.py cpls` (~53 MB) |
 
@@ -77,8 +75,7 @@ The ocean archive holds one file per month, `oc_october.csv` to
 
 The archives are kept by default (about 820 MB more), so nothing is downloaded
 twice. Pass `--remove-zips` to delete each one after it is extracted. Running
-the code adds more output: about 400 MB for `data/cache/cadp_feb2016.pkl` from the
-benchmarks, and up to about 2 GB in `results/`.
+the code adds more output: up to about 2 GB in `results/`.
 
 ---
 
@@ -92,7 +89,7 @@ All three put the files in the same place (section 4). Pick one.
 conda activate catraj                               # any Python 3.10+ works; only the standard library is used
 python scripts/download_data.py                # everything
 python scripts/download_data.py annotation     # tutorial 1 only
-python scripts/download_data.py cadp           # tutorial 2 and the benchmarks
+python scripts/download_data.py cadp           # tutorial 2
 python scripts/download_data.py cpls           # the full coastline for tutorial 3
 python scripts/download_data.py --check        # report what is present, download nothing
 ```
@@ -181,10 +178,10 @@ committed 24-hour sample in `sample/`.
 ```
 data/
 ├── sample/                           the sample (AIS, Weather, Coastline), committed (not used here)
-├── cache/                            files the benchmarks build, e.g. cadp_feb2016.pkl
+├── cache/                            files the scripts build
 └── zenodo_1167595/
     ├── P1_AIS_Data/
-    │   ├── nari_dynamic.csv          AIS positions             tutorials 1, 2 · benchmarks
+    │   ├── nari_dynamic.csv          AIS positions             tutorials 1, 2
     │   ├── nari_static.csv           vessel static data        tutorial 1
     │   └── README_parameters.txt     field descriptions        tutorial 1
     ├── P1_AIS_Codes/
@@ -194,7 +191,7 @@ data/
     │   ├── table_weatherStation.csv        station positions
     │   └── README_parameters.txt           field descriptions        tutorial 1
     ├── E1_ocean/
-    │   ├── oc_february.csv           sea state, Feb 2016       tutorial 2 · benchmarks
+    │   ├── oc_february.csv           sea state, Feb 2016       tutorial 2
     │   └── README_parameters.txt
     ├── C2_European_Coastline/
     │   ├── Europe Coastline (Polygone).shp   (+ .shx .dbf .prj)  land polygons   tutorial 3 (optional section)
@@ -215,10 +212,8 @@ data/
 | 1 | open `notebooks/01_trajectory_annotation.ipynb`, keep `SOURCE = "auto"` (or `"zenodo"`), run all | `clean/ais_dynamic.parquet`, `clean/weather.parquet`, the README files | `results/01_trajectory_annotation/`, including `06_fleet_annotated.parquet` (~1 GB) when `EXPORT_FLEET = True` |
 | 2 | `python scripts/cadp_on_annotated_fleet.py` | `06_fleet_annotated.parquet` from step 1 | `results/02_cadp_compression/` |
 | 3 | open `notebooks/02_cadp_compression.ipynb`, run all | `clean/ais_dynamic.parquet`, `clean/ocean_february.parquet` | figures and tables inline |
-| 4 | `python scripts/benchmarks/prepare_feb2016.py`, then `python scripts/benchmarks/paper_experiments.py` | the same two files | `data/cache/cadp_feb2016.pkl`, then the paper's experiments |
 
-Steps 1 and 3 depend on step 0; step 2 depends on step 1. Step 4 reads the raw
-CSVs and depends on none of them.
+Steps 1 and 3 depend on step 0; step 2 depends on step 1.
 
 Step 0 skips outputs that exist (`--force` rebuilds them), skips datasets that
 were not downloaded, and takes a few minutes for the full AIS file. It median-filters

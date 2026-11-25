@@ -19,8 +19,7 @@ data/
 │   ├── E2_Weather_Conditions/      # weather observations and stations
 │   ├── C2_European_Coastline/      # Europe Coastline (Polygone).shp (+ sidecars): the full EEA coastline
 │   └── clean/                      # scripts/prepare_zenodo.py: ais_dynamic, ocean_<month>, weather (.parquet)
-└── cache/                          # not committed: intermediate files the code builds; safe to delete
-    └── cadp_feb2016.pkl            # written by scripts/benchmarks/prepare_feb2016.py
+└── cache/                          # not committed: files the scripts build; safe to delete
 ```
 
 ## `sample/`: works without a download
@@ -31,7 +30,6 @@ data/
 | `notebooks/03_cpls_compression.ipynb` | `sample/AIS`, `sample/Coastline` |
 | `app/` (the annotation app) | `sample/AIS`, `sample/Weather` |
 | `tests/` (tests marked `data`) | `sample/AIS`, `sample/Weather`, `sample/Coastline` |
-| `scripts/benchmarks/equal_size_sample_data.py` | `sample/AIS`, `sample/Weather` |
 
 ## `zenodo_1167595/`: download it first
 
@@ -58,7 +56,6 @@ by hand. All three ways are explained step by step in
 | `notebooks/01_trajectory_annotation.ipynb` (`SOURCE = "zenodo"`) | `clean/ais_dynamic.parquet`, `clean/weather.parquet`, the README files in `P1_AIS_Data`, `E2_Weather_Conditions` |
 | `notebooks/02_cadp_compression.ipynb` | `clean/ais_dynamic.parquet`, `clean/ocean_february.parquet` |
 | `notebooks/03_cpls_compression.ipynb` (optional last section) | `C2_European_Coastline` |
-| `scripts/benchmarks/` | `P1_AIS_Data`, `E1_ocean` |
 
 ## Licences
 
