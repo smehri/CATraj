@@ -874,7 +874,7 @@ def _run_ocean(src: Path, out: Path, window, area, report, month=None):
         if report is not None:
             report.add("ocean", "ocean_month_matches",
                        f"oc_{month}.csv: times not in {month}, file skipped",
-                       n_in, 0, n_in)
+                       n_in, 0)
         return None
     oc = drop_invalid_ocean(oc, area, report)
     oc = drop_land_cells(oc, report)
