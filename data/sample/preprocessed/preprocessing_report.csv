@@ -4,6 +4,7 @@ AIS,drop_invalid_mmsi,mmsi: distress device (SART/MOB/EPIRB),1,0,1,0
 AIS,drop_invalid_mmsi,mmsi: placeholder,1,0,1,0
 AIS,drop_invalid_mmsi,mmsi: ship station kept,239075,239073,2,0
 AIS,drop_invalid_time,unix_time inside the archive period,239073,239073,0,0
+AIS,drop_excluded_periods,January 2016: no sea state in the archive (oc_january.csv repeats November),239073,239073,0,0
 AIS,drop_invalid_position,"lon, lat in valid range",239073,239073,0,0
 AIS,drop_invalid_position,position inside archive area,239073,239073,0,0
 AIS,unavailable_to_nan,speed_over_ground >= 102.3 (n/a),239073,239073,0,87
@@ -36,6 +37,7 @@ weather,weather_unavailable_to_nan,precipitation == -65536,768,768,0,744
 weather,weather_unavailable_to_nan,precipitation_period == -65536,768,768,0,206
 weather,merge_weather_stations,station in station table,768,768,0,0
 weather,drop_invalid_time,unix_time inside the archive period,768,768,0,0
+weather,drop_excluded_periods,January 2016: no sea state in the archive (oc_january.csv repeats November),768,768,0,0
 weather,check_weather_ranges,air_temperature outside -90..60,768,768,0,0
 weather,check_weather_ranges,min_air_temperature outside -90..60,768,768,0,0
 weather,check_weather_ranges,max_air_temperature outside -90..60,768,768,0,0
@@ -53,6 +55,7 @@ weather,denoise_weather,"median filter, 30 s window",768,768,0,0
 ocean,read_ocean_raw,rows read,850860,850860,0,0
 ocean,drop_invalid_time,unix_time inside the archive period,850860,850860,0,0
 ocean,drop_invalid_ocean,cell inside archive area,850860,850860,0,0
+ocean,drop_excluded_periods,January 2016: no sea state in the archive (oc_january.csv repeats November),850860,850860,0,0
 ocean,drop_land_cells,bottom_depth > -16000 (sea cell),850860,677736,173124,0
 ocean,ocean_unavailable_to_nan,wave_height < 0 (undefined),677736,677736,0,0
 ocean,ocean_unavailable_to_nan,wave_length < 0 (undefined),677736,677736,0,75

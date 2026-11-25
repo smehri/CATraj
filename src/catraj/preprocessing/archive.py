@@ -18,6 +18,16 @@ Names, units and "not available" codes come from each folder's
 A value outside its range becomes NaN; a row whose identifier, time or position
 is invalid is dropped, because nothing can be done with it.
 
+**January 2016 is left out of every dataset** (decided with the author,
+2026-11-25). The archive has no sea state for it: its ``oc_january.csv`` is a
+byte-for-byte copy of ``oc_november.csv`` (times 2015-11-01 to 2015-11-30; the
+zip's md5 matches the one Zenodo publishes, so the copy is in the source).
+So that every notebook works on the same period, :func:`drop_excluded_periods`
+drops the AIS, weather and sea-state rows of January (:data:`EXCLUDED_PERIODS`)
+and :func:`ocean_month_matches` refuses to write the copy as January. The data
+then covers October to December 2015 and February to March 2016. Pass
+``exclude=()`` to :func:`preprocess_archive` to keep January's AIS and weather.
+
 AIS (``P1_AIS_Data/nari_dynamic.csv``)
 --------------------------------------
 
@@ -131,8 +141,8 @@ from .filtering import denoise, rolling_filter
 from .mmsi import mmsi_classes
 
 __all__ = [
-    "AREA", "ARCHIVE_PERIOD", "CRS", "MONTHS", "PreprocessingReport",
-    "ocean_month_matches",
+    "AREA", "ARCHIVE_PERIOD", "CRS", "EXCLUDED_PERIODS", "MONTHS",
+    "PreprocessingReport", "ocean_month_matches", "drop_excluded_periods",
     "read_ais_raw", "mmsi_check", "drop_invalid_mmsi", "drop_invalid_time",
     "drop_invalid_position", "unavailable_to_nan", "check_ranges",
     "drop_duplicates_and_sort", "drop_position_jumps", "vessel_types",
@@ -152,6 +162,12 @@ ARCHIVE_PERIOD = (                  # unix seconds, both ends included (README)
     int(pd.Timestamp("2016-03-31 23:59:59", tz="UTC").timestamp()),
 )
 MONTHS = ("october", "november", "december", "january", "february", "march")
+#: Periods left out of every dataset: (first second, last second, reason).
+EXCLUDED_PERIODS = (
+    (1451606400, 1454284799,             # 2016-01-01 00:00 to 2016-01-31 23:59:59
+     "January 2016: no sea state in the archive (oc_january.csv repeats "
+     "November)"),
+)
 BATCH_ROWS = 1_500_000              # AIS rows filtered at once (whole vessels)
 POINT_GAP = 1e10                    # seconds between two series in a stacked time axis
 COASTLINE_CRS = 3035                # what the EEA file is in
@@ -326,6 +342,20 @@ def drop_invalid_time(df, report=None, dataset="AIS", column="unix_time",
     ok = _in_range(df[column], period[0], period[1])
     return _drop(df, ok, report, dataset, "drop_invalid_time",
                  f"{column} inside the archive period")
+
+
+def drop_excluded_periods(df, periods=EXCLUDED_PERIODS, report=None,
+                          dataset="AIS", column="unix_time") -> pd.DataFrame:
+    """Drop the rows inside any of ``periods`` (by default, January 2016).
+
+    ``periods`` holds ``(first, last, reason)`` tuples, unix seconds, both ends
+    included; ``None`` or ``()`` keeps everything.
+    """
+    for first, last, reason in periods or ():
+        t = df[column]
+        df = _drop(df, ~((t >= first) & (t <= last)), report, dataset,
+                   "drop_excluded_periods", reason)
+    return df
 
 
 def drop_invalid_position(ais, area=AREA, report=None, dataset="AIS",
@@ -812,12 +842,14 @@ def _to_parquet(df, path: Path) -> None:
     sink.close()
 
 
-def _run_ais(raw: Path, out: Path, window, area, report, batch_rows, max_speed):
+def _run_ais(raw: Path, out: Path, window, area, report, batch_rows, max_speed,
+             exclude=EXCLUDED_PERIODS):
     folder = raw / "P1_AIS_Data"
     ais = read_ais_raw(folder / "nari_dynamic.csv", report)
     mmsi_check(ais).to_csv(out.with_name("mmsi_check.csv"), index=False)
     ais = drop_invalid_mmsi(ais, report)
     ais = drop_invalid_time(ais, report)
+    ais = drop_excluded_periods(ais, exclude, report)
     ais = drop_invalid_position(ais, area, report)
     ais = unavailable_to_nan(ais, report)
     ais = check_ranges(ais, report)
@@ -841,12 +873,13 @@ def _run_ais(raw: Path, out: Path, window, area, report, batch_rows, max_speed):
     return n_out
 
 
-def _run_weather(raw: Path, out: Path, window, report):
+def _run_weather(raw: Path, out: Path, window, report, exclude=EXCLUDED_PERIODS):
     obs, stations, wind = read_weather_raw(raw / "E2_Weather_Conditions", report)
     n_in = len(obs)
     obs = weather_unavailable_to_nan(obs, report)
     obs = merge_weather_stations(obs, stations, report)
     obs = drop_invalid_weather(obs, report)
+    obs = drop_excluded_periods(obs, exclude, report, dataset="weather")
     obs = check_weather_ranges(obs, wind, report)
     obs = denoise_weather(obs, window, report)
     _to_parquet(obs, out)
@@ -867,7 +900,8 @@ def ocean_month_matches(oc, month) -> bool:
     return stamp.strftime("%B").lower() == month
 
 
-def _run_ocean(src: Path, out: Path, window, area, report, month=None):
+def _run_ocean(src: Path, out: Path, window, area, report, month=None,
+               exclude=EXCLUDED_PERIODS):
     oc = read_ocean_raw(src, report)
     n_in = len(oc)
     if month is not None and not ocean_month_matches(oc, month):
@@ -877,6 +911,7 @@ def _run_ocean(src: Path, out: Path, window, area, report, month=None):
                        n_in, 0)
         return None
     oc = drop_invalid_ocean(oc, area, report)
+    oc = drop_excluded_periods(oc, exclude, report, dataset="ocean")
     oc = drop_land_cells(oc, report)
     oc = ocean_unavailable_to_nan(oc, report)
     oc = check_ocean_ranges(oc, report)
@@ -898,7 +933,7 @@ def _run_coastline(src: Path, out: Path, area, report):
 
 def preprocess_archive(raw_root, out_root, window=30.0, *, force=False, area=AREA,
                        months=MONTHS, batch_rows=BATCH_ROWS, max_speed_knots=50,
-                       log=print):
+                       exclude=EXCLUDED_PERIODS, log=print):
     """Preprocess every dataset found under ``raw_root``; write to ``out_root``.
 
     ``raw_root`` is the archive (``data/zenodo_1167595``) or a sample cut from it
@@ -924,6 +959,9 @@ def preprocess_archive(raw_root, out_root, window=30.0, *, force=False, area=ARE
     max_speed_knots : float or None
         Isolated AIS position jumps above this speed are dropped (default 50;
         ``None`` disables the rule).
+    exclude : sequence of (first, last, reason) or None
+        Periods dropped from every dataset (default :data:`EXCLUDED_PERIODS`,
+        January 2016); ``()`` keeps everything.
     log : callable or None
         Called with each progress line; ``None`` is silent.
 
@@ -945,17 +983,17 @@ def preprocess_archive(raw_root, out_root, window=30.0, *, force=False, area=ARE
     shp = raw_root / "C2_European_Coastline" / "Europe Coastline (Polygone).shp"
     jobs = [("AIS", [ais], out_root / "AIS" / "ais.parquet",
              lambda t: _run_ais(raw_root, t, window, area, report, batch_rows,
-                                  max_speed_knots)),
+                                  max_speed_knots, exclude)),
             ("weather", [wdir / "table_wheatherObservation.csv",
                          wdir / "table_weatherStation.csv"],
              out_root / "Weather" / "weather.parquet",
-             lambda t: _run_weather(raw_root, t, window, report))]
+             lambda t: _run_weather(raw_root, t, window, report, exclude))]
     for month in months:
         src = raw_root / "E1_ocean" / f"oc_{month}.csv"
         jobs.append((f"ocean {month}", [src],
                      out_root / "Ocean" / f"ocean_{month}.parquet",
                      lambda t, src=src, month=month: _run_ocean(
-                         src, t, window, area, report, month)))
+                         src, t, window, area, report, month, exclude)))
     jobs.append(("coastline", [shp], out_root / "Coastline" / "coastline.parquet",
                  lambda t: _run_coastline(shp, t, area, report)))
 

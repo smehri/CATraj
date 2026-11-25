@@ -13,7 +13,7 @@ from catraj.preprocessing import (
     project, sort_ocean, unavailable_to_nan, weather_unavailable_to_nan,
     merge_weather_stations,
 )
-from helpers import ROOT
+from helpers import ROOT, SAMPLE
 
 T0 = ARCHIVE_PERIOD[0] + 86_400 * 40          # a time inside the archive's period
 SHIP = 227705102                              # France, MID 227
@@ -501,7 +501,7 @@ def test_preprocess_archive_skips_absent_and_existing(processed, tmp_path):
 def test_committed_preprocessed_sample():
     import geopandas as gpd
 
-    root = ROOT / "data" / "sample" / "preprocessed"
+    root = SAMPLE
     if not (root / "AIS" / "ais.parquet").exists():
         pytest.skip("data/sample/preprocessed not present")
     t0 = int(pd.Timestamp("2015-11-09", tz="UTC").timestamp())
@@ -548,3 +548,20 @@ def test_ocean_file_of_another_month_is_skipped(tmp_path):
                                 months=("january",))
     assert not (tmp_path / "out" / "Ocean" / "ocean_january.parquet").exists()
     assert "file skipped" in report.to_text()
+
+
+def test_january_2016_is_excluded_by_default():
+    from catraj.preprocessing import (EXCLUDED_PERIODS, PreprocessingReport,
+                                      drop_excluded_periods)
+    day = 86400
+    jan1 = int(pd.Timestamp("2016-01-01", tz="UTC").timestamp())
+    feb1 = int(pd.Timestamp("2016-02-01", tz="UTC").timestamp())
+    times = [jan1 - 1, jan1, jan1 + 15 * day, feb1 - 1, feb1]
+    df = ais_frame(unix_time=times)
+    r = PreprocessingReport()
+    out = drop_excluded_periods(df, report=r)
+    assert out.unix_time.tolist() == [jan1 - 1, feb1]
+    assert r.to_frame().rows_dropped.tolist() == [3]
+    assert "January 2016" in EXCLUDED_PERIODS[0][2]
+    assert len(drop_excluded_periods(df, ())) == len(df)
+    assert len(drop_excluded_periods(df, None)) == len(df)
