@@ -56,7 +56,7 @@ publisher via the DOI. The implementation does not depend on having them.
 | [`notebooks/`](notebooks/) | the notebooks, in reading order |
 | [`scripts/`](scripts/) | command-line scripts: the data downloader and whole-archive workflows |
 | [`app/`](app/) | the interactive annotation app |
-| [`data/`](data/) | all data: the two-day sample in `sample/` (raw and preprocessed), committed; the downloaded archive in `zenodo_1167595/` (and its `preprocessed/` folder), not committed |
+| [`data/`](data/) | all data: two datasets, `ZenodoData/` (Brest AIS, Zenodo) and `UsAIS/` (US MarineCadastre AIS, NOAA shoreline); each has a committed two-day `sample/` (raw and preprocessed), while the downloads and the full `preprocessed/` folders are not committed |
 | `results/` | everything the notebooks, scripts and app write, not committed ([`README`](results/README.md)) |
 | [`docs/`](docs/) | the source papers (open-access ones) and [`getting_the_data.md`](docs/getting_the_data.md) |
 | [`binder/`](binder/) | the environment Binder builds for the notebooks |
@@ -66,7 +66,7 @@ publisher via the DOI. The implementation does not depend on having them.
 
 ## Notebooks
 
-The notebooks run live on [Binder](https://mybinder.org) with no install and no account, on the committed sample (`data/sample/`). github.com does not render the interactive hvplot figures, so use Binder or nbviewer to see them.
+The notebooks run live on [Binder](https://mybinder.org) with no install and no account, on the committed sample (`data/ZenodoData/sample/`). github.com does not render the interactive hvplot figures, so use Binder or nbviewer to see them.
 
 | Notebook | Purpose | Run | View | Full-archive run |
 |---|---|---|---|---|
@@ -350,7 +350,7 @@ it applies.
 
 ### Sample data, included
 
-`data/sample/` holds a two-day extract of the archive, 2015-11-09 00:00 to
+`data/ZenodoData/sample/` holds a two-day extract of the archive, 2015-11-09 00:00 to
 2015-11-11 00:00 UTC, in two forms: `raw/` (the archive's own CSV and shapefile
 layout, 60 MB) and `preprocessed/` (Parquet, 9 MB). The notebooks, the app and
 the tests read the preprocessed form with `catraj.datasets`:
@@ -371,8 +371,8 @@ ais = load_ais()    # GeoDataFrame in EPSG:32630; unix_time, mmsi, ...
 `scripts/make_sample.py` cut `raw/` from the full archive and
 `scripts/prepare_zenodo.py` (that is, `catraj.preprocessing.preprocess_archive`)
 made `preprocessed/`; the same call on the whole archive writes
-`data/zenodo_1167595/preprocessed/` (not committed), which the loaders also read
-(`load_ais("data/zenodo_1167595/preprocessed")`).
+`data/ZenodoData/preprocessed/` (not committed), which the loaders also read
+(`load_ais("data/ZenodoData/preprocessed")`).
 
 **These carry their own licences**, stricter than the code's — the AIS
 extract is CC BY-NC-SA 4.0, so no commercial use. The coastline (EEA) may be
@@ -394,12 +394,12 @@ notebook `01_preprocessing` (`DOWNLOAD = True`, `PREPROCESS_FULL = True`) or:
 ```bash
 python scripts/download_data.py --months all  # ~825 MB download, ~5.3 GB extracted; or: annotation (~203 MB) | cadp (~771 MB) | cpls (~53 MB)
 python scripts/download_data.py --check       # what is present
-python scripts/prepare_zenodo.py --n-jobs -1  # writes data/zenodo_1167595/preprocessed/ (about 2 minutes)
+python scripts/prepare_zenodo.py --n-jobs -1  # writes data/ZenodoData/preprocessed/ (about 2 minutes)
 ```
 
 The script uses only the standard library. It verifies each archive against
 the checksum Zenodo publishes, resumes interrupted downloads, and extracts into
-`data/zenodo_1167595/`, which git ignores.
+`data/ZenodoData/`, which git ignores.
 [`docs/getting_the_data.md`](docs/getting_the_data.md)
 covers everything else: which notebook needs which files, downloading by hand,
 disk space, the order to run things in, troubleshooting, and the licences.

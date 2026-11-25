@@ -1,7 +1,7 @@
 """Cut the committed multi-day sample from the raw Zenodo archive.
 
-Reads ``data/zenodo_1167595/`` (``scripts/download_data.py``) and writes
-``data/sample/raw/``, which mirrors the archive's folders, file names and CSV
+Reads ``data/ZenodoData/`` (``scripts/download_data.py``) and writes
+``data/ZenodoData/sample/raw/``, which mirrors the archive's folders, file names and CSV
 formats, so ``catraj.preprocessing.preprocess_archive`` reads either root:
 
 ====================================  ===========================================
@@ -22,7 +22,7 @@ Every folder's ``README_parameters.txt`` is copied. The default window is
 exclusive): 565 vessels and complete hourly weather at the 16 stations.
 
 ``oc_november.csv`` is extracted from ``E1_Ocean_Conditions.zip`` into
-``data/zenodo_1167595/E1_ocean/`` if it is not there (the zip is kept).
+``data/ZenodoData/E1_ocean/`` if it is not there (the zip is kept).
 
 The sample's bounding box is that of the window's AIS positions that lie in the
 archive's stated area, plus ``--margin`` degrees. The coastline is clipped to
@@ -53,8 +53,8 @@ import numpy as np
 import pandas as pd
 
 ROOT = Path(__file__).resolve().parents[1]
-DATA = ROOT / "data" / "zenodo_1167595"
-OUT = ROOT / "data" / "sample" / "raw"
+DATA = ROOT / "data" / "ZenodoData"
+OUT = ROOT / "data" / "ZenodoData" / "sample" / "raw"
 CHUNK = 2_000_000                 # CSV rows read at once
 OCEAN_STEP = 3 * 3600             # the sea-state forecast's step, in seconds
 AREA = (-10.0, 0.0, 45.0, 51.0)   # lon_min, lon_max, lat_min, lat_max: the archive's
@@ -227,7 +227,7 @@ def report_sizes(out: Path) -> bool:
         print(f"  {p.stat().st_size / 1e6:9.3f} MB  {p.relative_to(out).as_posix()}")
     big = max((p.stat().st_size for p in files), default=0)
     print(f"  {total / 1e6:9.3f} MB  total of {_rel(out)} "
-          f"(budget for data/sample/: {BUDGET_TOTAL / 1e6:.0f} MB, "
+          f"(budget for data/ZenodoData/sample/: {BUDGET_TOTAL / 1e6:.0f} MB, "
           f"one file {BUDGET_FILE / 1e6:.0f} MB)")
     return total <= BUDGET_TOTAL and big <= BUDGET_FILE
 
@@ -237,9 +237,9 @@ def main(argv: list[str] | None = None) -> int:
         description="Cut the multi-day sample from the raw Zenodo archive.",
         epilog="Needs scripts/download_data.py to have run. See the module docstring.")
     parser.add_argument("--data", type=Path, default=DATA,
-                        help="the raw archive (default: data/zenodo_1167595)")
+                        help="the raw archive (default: data/ZenodoData)")
     parser.add_argument("--out", type=Path, default=OUT,
-                        help="where to write (default: data/sample/raw)")
+                        help="where to write (default: data/ZenodoData/sample/raw)")
     parser.add_argument("--start", default="2015-11-09 00:00",
                         help="window start, UTC, inclusive (default: 2015-11-09 00:00)")
     parser.add_argument("--end", default="2015-11-11 00:00",

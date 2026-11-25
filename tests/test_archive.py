@@ -503,7 +503,7 @@ def test_committed_preprocessed_sample():
 
     root = SAMPLE
     if not (root / "AIS" / "ais.parquet").exists():
-        pytest.skip("data/sample/preprocessed not present")
+        pytest.skip("data/ZenodoData/sample/preprocessed not present")
     t0 = int(pd.Timestamp("2015-11-09", tz="UTC").timestamp())
     t1 = int(pd.Timestamp("2015-11-11", tz="UTC").timestamp())
     ais = pd.read_parquet(root / "AIS" / "ais.parquet")

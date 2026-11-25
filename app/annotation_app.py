@@ -320,10 +320,10 @@ overview_tab = pn.Column(
 
 traj_path = pn.widgets.TextInput(
     name="Trajectory file (.parquet with x, y, or a vector file)",
-    value="data/sample/preprocessed/AIS/ais.parquet")
+    value="data/ZenodoData/sample/preprocessed/AIS/ais.parquet")
 station_path = pn.widgets.TextInput(
     name="Context station file (.parquet with x, y, or a vector file)",
-    value="data/sample/preprocessed/Weather/weather.parquet")
+    value="data/ZenodoData/sample/preprocessed/Weather/weather.parquet")
 # The preprocessed columns have readable names, so no description file is
 # needed by default.
 traj_dict_path = pn.widgets.TextInput(

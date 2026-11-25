@@ -48,7 +48,7 @@ panel serve app/annotation_app.py --show
 ## A first run
 
 1. **Data** — the paths are pre-filled with the committed preprocessed sample
-   (`data/sample/preprocessed/AIS/ais.parquet` and `Weather/weather.parquet`,
+   (`data/ZenodoData/sample/preprocessed/AIS/ais.parquet` and `Weather/weather.parquet`,
    2015-11-09 and 10). Click **Load**. A `.parquet` file needs `x` and `y`
    columns in EPSG:32630; any other vector file (shapefile, GeoPackage) is read
    as it is, and needs its own projected CRS.

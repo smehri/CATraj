@@ -7,19 +7,19 @@ import pytest
 from catraj import datasets
 from catraj.datasets import (
     load_ais, load_coastline, load_ocean, load_weather, read_points, repo_root,
-    sample_root,
+    full_root, sample_root,
 )
 
 pytestmark = pytest.mark.data
 
 
 def test_roots_are_found():
-    assert (repo_root() / "data" / "sample").is_dir()
-    assert sample_root() == repo_root() / "data" / "sample" / "preprocessed"
+    assert (repo_root() / "data" / "ZenodoData" / "sample").is_dir()
+    assert sample_root() == repo_root() / "data" / "ZenodoData" / "sample" / "preprocessed"
 
 
 def test_repo_root_is_found_from_the_environment(tmp_path, monkeypatch):
-    (tmp_path / "data" / "sample").mkdir(parents=True)
+    (tmp_path / "data" / "ZenodoData" / "sample").mkdir(parents=True)
     monkeypatch.setenv("CATRAJ_ROOT", str(tmp_path))
     assert repo_root() == tmp_path
 
@@ -28,7 +28,7 @@ def test_repo_root_errors_when_absent(tmp_path, monkeypatch):
     monkeypatch.delenv("CATRAJ_ROOT", raising=False)
     monkeypatch.chdir(tmp_path)
     monkeypatch.setattr(datasets, "__file__", str(tmp_path / "a" / "b" / "c.py"))
-    with pytest.raises(FileNotFoundError, match="data/sample"):
+    with pytest.raises(FileNotFoundError, match="data/ZenodoData/sample"):
         repo_root()
 
 
@@ -75,3 +75,11 @@ def test_read_points_reads_parquet_and_other_files(tmp_path):
     gpd.GeoDataFrame({"a": [1]}, geometry=gpd.points_from_xy([1.0], [2.0]),
                      crs=32630).to_file(shp)
     assert read_points(shp).crs.to_epsg() == 32630
+
+
+def test_dataset_argument():
+    assert sample_root("zenodo") == sample_root()
+    with pytest.raises(ValueError, match="dataset"):
+        sample_root("mars")
+    with pytest.raises(ValueError, match="dataset"):
+        full_root("mars")

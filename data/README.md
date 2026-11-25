@@ -1,8 +1,11 @@
 # data — all data
 
-All the data the project reads lives here. Only `sample/` is committed. git
-ignores `zenodo_1167595/` (the downloaded archive, and its `preprocessed/`
-folder) because it is large and carries its own licences.
+All the data the project reads lives here, in two datasets: `ZenodoData/`
+(the Brest AIS archive from Zenodo) and `UsAIS/` (US MarineCadastre AIS and the
+NOAA shoreline). Only each dataset's `sample/` is committed. git ignores
+everything else (the downloads and the full `preprocessed/` folders) because
+it is large and carries its own licences. The rest of this file describes
+`ZenodoData/`; `UsAIS/` is documented where its preprocessing is.
 
 Two forms of the data exist. *Raw* is the Zenodo archive exactly as published
 (CSV files with coded column names and "not available" codes, and a
@@ -16,29 +19,33 @@ form, through `catraj.datasets`.
 data/
 ├── README.md                       # this file
 ├── LICENSE.md                      # data licences (the code's BSD licence does not cover data)
-├── sample/                         # committed: two days, 2015-11-09 00:00 to 2015-11-11 00:00 UTC (60 MB raw, 9 MB preprocessed)
-│   ├── raw/                        # the archive's own layout, cut to the window and the AIS area (scripts/make_sample.py)
-│   │   ├── P1_AIS_Data/            # nari_dynamic.csv, nari_static.csv, README_parameters.txt
-│   │   ├── P1_AIS_Codes/           # code tables, whole
-│   │   ├── E2_Weather_Conditions/  # observations in the window, stations whole
-│   │   ├── E1_ocean/               # oc_november.csv: the window plus one 3 h step each side
-│   │   └── C2_European_Coastline/  # Europe Coastline (Polygone).shp (+ sidecars), clipped
-│   └── preprocessed/               # preprocess_archive(raw, ...) over the folder above
-│       ├── AIS/                    # ais.parquet, mmsi_check.csv
-│       ├── Weather/                # weather.parquet
-│       ├── Ocean/                  # ocean_november.parquet
-│       ├── Coastline/              # coastline.parquet (GeoParquet, EPSG:32630)
-│       └── preprocessing_report.csv, .txt   # rows in and out of every step
-├── zenodo_1167595/                 # not committed: the full archive, doi:10.5281/zenodo.1167595 (Ray et al., 2019)
+├── ZenodoData/                     # Brest AIS, doi:10.5281/zenodo.1167595 (Ray et al., 2019)
 │   ├── P1_AIS_Data/                # nari_dynamic.csv, nari_static.csv, README_parameters.txt
 │   ├── P1_AIS_Codes/               # Ship Types List.csv, MMSI Country Codes.csv, ...
 │   ├── E1_ocean/                   # oc_<month>.csv (sea state; January's is a copy of November's and is not used), README_parameters.txt
 │   ├── E2_Weather_Conditions/      # weather observations and stations
 │   ├── C2_European_Coastline/      # Europe Coastline (Polygone).shp (+ sidecars): the full EEA coastline
-│   └── preprocessed/               # not committed: scripts/prepare_zenodo.py (or notebook 01) writes AIS/ais.parquet, Weather/, Ocean/ocean_<month>.parquet, Coastline/
+│   ├── preprocessed/               # not committed: scripts/prepare_zenodo.py (or notebook 01) writes AIS/ais.parquet, Weather/, Ocean/ocean_<month>.parquet, Coastline/
+│   └── sample/                         # committed: two days, 2015-11-09 00:00 to 2015-11-11 00:00 UTC (60 MB raw, 9 MB preprocessed)
+│       ├── raw/                        # the archive's own layout, cut to the window and the AIS area (scripts/make_sample.py)
+│       │   ├── P1_AIS_Data/            # nari_dynamic.csv, nari_static.csv, README_parameters.txt
+│       │   ├── P1_AIS_Codes/           # code tables, whole
+│       │   ├── E2_Weather_Conditions/  # observations in the window, stations whole
+│       │   ├── E1_ocean/               # oc_november.csv: the window plus one 3 h step each side
+│       │   └── C2_European_Coastline/  # Europe Coastline (Polygone).shp (+ sidecars), clipped
+│       └── preprocessed/               # preprocess_archive(raw, ...) over the folder above
+│           ├── AIS/                    # ais.parquet, mmsi_check.csv
+│           ├── Weather/                # weather.parquet
+│           ├── Ocean/                  # ocean_november.parquet
+│           ├── Coastline/              # coastline.parquet (GeoParquet, EPSG:32630)
+│           └── preprocessing_report.csv, .txt   # rows in and out of every step
+└── UsAIS/                          # US MarineCadastre AIS and NOAA shoreline
+    ├── csv2017/  2025/  shoreline/ # not committed: raw downloads
+    ├── preprocessed/               # not committed: the full output
+    └── sample/                     # committed: raw/ and preprocessed/
 ```
 
-## `sample/`: works without a download
+## `ZenodoData/sample/`: works without a download
 
 A two-day window, 2015-11-09 00:00 to 2015-11-11 00:00 UTC (start inclusive,
 end exclusive), cut from the archive and kept in both forms.
@@ -53,8 +60,8 @@ end exclusive), cut from the archive and kept in both forms.
 Size on disk: `raw/` 60 MB (the sea state is 44 MB of it), `preprocessed/` 9 MB.
 
 How it was made: `python scripts/make_sample.py` cuts `raw/` from
-`zenodo_1167595/` (it needs the full download), and
-`python scripts/prepare_zenodo.py --data data/sample/raw --out data/sample/preprocessed`
+`ZenodoData/` (it needs the full download), and
+`python scripts/prepare_zenodo.py --data data/ZenodoData/sample/raw --out data/ZenodoData/sample/preprocessed`
 (that is, `catraj.preprocessing.preprocess_archive`) makes `preprocessed/`. The
 step-by-step account is in `preprocessed/preprocessing_report.txt`.
 
@@ -77,7 +84,7 @@ land = load_coastline()
 | `tests/` (tests marked `data`) | `preprocessed/` (all four), `raw/E2_Weather_Conditions/README_parameters.txt` |
 | `tests/test_archive.py`, `scripts/prepare_zenodo.py` | `raw/` |
 
-## `zenodo_1167595/`: download it first
+## `ZenodoData/`: download it first
 
 To fill it, run this from the repository root:
 
@@ -87,7 +94,7 @@ python scripts/download_data.py          # or: annotation | cadp | cpls | --chec
 
 Then preprocess it (descriptive column names, "not available" codes as NaN,
 ranges checked, projection to EPSG:32630, noise removed with a median filter),
-which writes `zenodo_1167595/preprocessed/` (not committed; the whole archive's
+which writes `ZenodoData/preprocessed/` (not committed; the whole archive's
 AIS alone is about 18 million rows):
 
 ```bash
@@ -95,7 +102,7 @@ python scripts/prepare_zenodo.py         # needs pyarrow; --force rebuilds, --wi
 ```
 
 or, from Python, `catraj.preprocessing.preprocess_archive(raw_root, out_root)`.
-`catraj.datasets.load_ais("data/zenodo_1167595/preprocessed")` and the other
+`catraj.datasets.load_ais("data/ZenodoData/preprocessed")` and the other
 loaders read the result.
 
 The full-archive runs use the five months with a sea state: October to

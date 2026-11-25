@@ -4,10 +4,10 @@
 data in this folder comes from third parties and carries its own terms, which
 are stricter. Read them before redistributing or using this data.
 
-This file covers the sample committed in `sample/`, in both forms: `raw/` (the
+This file covers the sample committed in `ZenodoData/sample/`, in both forms: `raw/` (the
 archive's own files, cut to a window) and `preprocessed/` (derived from it).
 The terms below apply to both. The archive's own `README_parameters.txt` files,
-copied into `sample/raw/`, carry the full field descriptions and provenance.
+copied into `ZenodoData/sample/raw/`, carry the full field descriptions and provenance.
 
 The full archive you download into `zenodo_1167595/` comes from the same
 source under the same terms, plus the sea state data. Its licences are listed
@@ -16,7 +16,7 @@ in section 7 of
 
 ---
 
-## AIS — `sample/raw/P1_AIS_*`, `sample/preprocessed/AIS/`
+## AIS — `ZenodoData/sample/raw/P1_AIS_*`, `ZenodoData/sample/preprocessed/AIS/`
 
 Vessel positions from the Automatic Identification System.
 
@@ -38,7 +38,7 @@ Vessel positions from the Automatic Identification System.
 
 ---
 
-## Weather — `sample/raw/E2_Weather_Conditions/`, `sample/preprocessed/Weather/`
+## Weather — `ZenodoData/sample/raw/E2_Weather_Conditions/`, `ZenodoData/sample/preprocessed/Weather/`
 
 Coastal weather observations.
 
@@ -56,7 +56,7 @@ compass point). The archive's missing value (-65536) is NaN there.
 
 ---
 
-## Sea state — `sample/raw/E1_ocean/`, `sample/preprocessed/Ocean/`
+## Sea state — `ZenodoData/sample/raw/E1_ocean/`, `ZenodoData/sample/preprocessed/Ocean/`
 
 Wave and sea-level forecast on a grid (WAVEWATCH III).
 
@@ -68,7 +68,7 @@ Wave and sea-level forecast on a grid (WAVEWATCH III).
 
 ---
 
-## Coastline — `sample/raw/C2_European_Coastline/`, `sample/preprocessed/Coastline/`
+## Coastline — `ZenodoData/sample/raw/C2_European_Coastline/`, `ZenodoData/sample/preprocessed/Coastline/`
 
 Land polygons, used as barriers by CPLS compression.
 

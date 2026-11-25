@@ -3,7 +3,7 @@
 Everything here is synthetic: a field whose true value is known everywhere, so
 an interpolator's answer can be checked exactly rather than eyeballed.  Tests
 that need the real sample data carry the ``data`` marker and skip when
-``data/sample/preprocessed/`` is absent.
+``data/ZenodoData/sample/preprocessed/`` is absent.
 """
 
 import os
@@ -41,7 +41,7 @@ def pytest_collection_modifyitems(config, items):
     if (SAMPLE / "AIS" / "ais.parquet").exists():
         return
     skip = pytest.mark.skip(
-        reason="preprocessed sample in data/sample/preprocessed/ not present")
+        reason="preprocessed sample in data/ZenodoData/sample/preprocessed/ not present")
     for item in items:
         if "data" in item.keywords:
             item.add_marker(skip)

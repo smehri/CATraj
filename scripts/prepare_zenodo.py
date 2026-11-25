@@ -1,8 +1,8 @@
 """Prepare the Zenodo data the notebooks read: descriptive names, noise removed.
 
 Run it once after ``scripts/download_data.py``. It reads the archive in
-``data/zenodo_1167595/`` and writes Parquet files to
-``data/zenodo_1167595/preprocessed/`` (git ignores the whole folder):
+``data/ZenodoData/`` and writes Parquet files to
+``data/ZenodoData/preprocessed/`` (git ignores the whole folder):
 
 =====================================  ==========================================
 ``AIS/ais.parquet``                    every valid AIS position, with vessel type
@@ -30,7 +30,7 @@ Usage, from the repository root, in the ``catraj`` environment (it needs
     python scripts/prepare_zenodo.py --force          # rebuild files that exist
     python scripts/prepare_zenodo.py --window 60      # another window, in seconds
     python scripts/prepare_zenodo.py --n-jobs -1      # every core (1: serial, the default)
-    python scripts/prepare_zenodo.py --data data/sample/raw --out data/sample/preprocessed
+    python scripts/prepare_zenodo.py --data data/ZenodoData/sample/raw --out data/ZenodoData/sample/preprocessed
 
 An output that already exists is skipped unless ``--force``; a dataset whose raw
 files are absent is skipped with a message. The full AIS file (~19 million
@@ -50,7 +50,7 @@ import time
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-DATA = ROOT / "data" / "zenodo_1167595"
+DATA = ROOT / "data" / "ZenodoData"
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -58,7 +58,7 @@ def main(argv: list[str] | None = None) -> int:
         description="Preprocess the Zenodo archive: names, codes, ranges, noise.",
         epilog="Run scripts/download_data.py first. Full guide: docs/getting_the_data.md")
     parser.add_argument("--data", type=Path, default=DATA,
-                        help="folder holding the raw archive (default: data/zenodo_1167595)")
+                        help="folder holding the raw archive (default: data/ZenodoData)")
     parser.add_argument("--out", type=Path, default=None,
                         help="where to write (default: DATA/preprocessed)")
     parser.add_argument("--window", type=float, default=30.0,

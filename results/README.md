@@ -15,7 +15,7 @@ they ran on (`sample` or `full`, the `DATA` setting):
 | `02_cadp_compression/` | `scripts/cadp_on_annotated_fleet.py` (see `scripts/README.md`) | the CADP-compressed fleet in both modes, a per-vessel table and a summary |
 
 Notebook 01 writes no results: its output is the preprocessed data, in
-`data/sample/preprocessed/` (committed) and `data/zenodo_1167595/preprocessed/`.
+`data/ZenodoData/sample/preprocessed/` (committed) and `data/ZenodoData/preprocessed/`.
 
 `01_trajectory_annotation/` and `zenodo_runs/` may exist on a machine that ran
 the earlier versions of the notebooks; nothing current writes to them.

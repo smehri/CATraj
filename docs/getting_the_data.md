@@ -15,7 +15,7 @@ python scripts/download_data.py
 ```
 
 It downloads about 825 MB from Zenodo, checks each file against its published
-checksum, and extracts what the code reads into `data/zenodo_1167595/`. By
+checksum, and extracts what the code reads into `data/ZenodoData/`. By
 default it extracts one month of sea state (February); **the full-archive runs
 need five**, so use `--months all` (or `--months oct,nov,dec,feb,mar`):
 
@@ -41,7 +41,7 @@ then `PREPROCESS_FULL = True`).
 
 | you want to run | data it needs | download |
 |---|---|---|
-| any of notebooks `01` to `05` with `DATA = "sample"` (the default), the app, the tests | `data/sample/` (raw and preprocessed), **already in the repository** | none |
+| any of notebooks `01` to `05` with `DATA = "sample"` (the default), the app, the tests | `data/ZenodoData/sample/` (raw and preprocessed), **already in the repository** | none |
 | notebooks `02` to `04` with `DATA = "full"` | the preprocessed AIS, weather, sea state (five months) and coastline | `download_data.py --months all`, then `prepare_zenodo.py` (or notebook `01`) |
 | notebook `05` with `DATA = "full"` | the full-archive output of notebook `03` (`results/03_two_stage_cpls_compression/full/`) | run notebook `03` with `DATA = "full"` first |
 | `scripts/cadp_on_annotated_fleet.py` | `results/01_trajectory_annotation/06_fleet_annotated.parquet`, written by an earlier version of the annotation notebook (see `scripts/README.md`) | not part of the current notebooks |
@@ -56,19 +56,19 @@ its files in `preprocessed/`, not the raw CSVs.
 
 ### The sample, raw and preprocessed
 
-`data/sample/` holds the same archive cut to two days, 2015-11-09 00:00 to
-2015-11-11 00:00 UTC, in two forms (60 MB and 9 MB). `data/sample/raw/` mirrors
+`data/ZenodoData/sample/` holds the same archive cut to two days, 2015-11-09 00:00 to
+2015-11-11 00:00 UTC, in two forms (60 MB and 9 MB). `data/ZenodoData/sample/raw/` mirrors
 the archive's own folders, file names and CSV layout: 239,075 AIS messages of
 565 vessels, the 16 weather stations hourly, one month of sea state
 (`oc_november.csv`, the window plus one 3 h step each side), and the coastline
-clipped to the AIS area. `data/sample/preprocessed/` is what
+clipped to the AIS area. `data/ZenodoData/sample/preprocessed/` is what
 `catraj.preprocessing.preprocess_archive` makes of it, with the same layout
-the full archive gets in `data/zenodo_1167595/preprocessed/`:
+the full archive gets in `data/ZenodoData/preprocessed/`:
 `AIS/ais.parquet`, `Weather/weather.parquet`, `Ocean/ocean_november.parquet`,
 `Coastline/coastline.parquet`, `AIS/mmsi_check.csv` and
 `preprocessing_report.csv`/`.txt`. It was cut
 by `scripts/make_sample.py` (which needs this download) and preprocessed with
-`scripts/prepare_zenodo.py --data data/sample/raw --out data/sample/preprocessed`.
+`scripts/prepare_zenodo.py --data data/ZenodoData/sample/raw --out data/ZenodoData/sample/preprocessed`.
 Read either with `catraj.datasets` (`load_ais`, `load_weather`, `load_ocean`,
 `load_coastline`; pass the full archive's `preprocessed` folder as `root`).
 
@@ -164,8 +164,8 @@ or if you want a download manager.
    # Linux, macOS, or Windows 10+ (in PowerShell type curl.exe, not curl).
    # -C - resumes an interrupted download; the URLs are percent-encoded on purpose.
    cd data
-   mkdir zenodo_1167595
-   cd zenodo_1167595
+   mkdir ZenodoData
+   cd ZenodoData
    curl -L -C - -o P1_AIS_Data.zip                    "https://zenodo.org/records/1167595/files/%5BP1%5D%20AIS%20Data.zip?download=1"
    curl -L -C - -o P1_AIS_Status_Codes_and_Types.zip  "https://zenodo.org/records/1167595/files/%5BP1%5D%20AIS%20Status%2C%20Codes%20and%20Types.zip?download=1"
    curl -L -C - -o E2_Weather_Conditions.zip          "https://zenodo.org/records/1167595/files/%5BE2%5D%20Weather%20Conditions.zip?download=1"
@@ -220,7 +220,7 @@ committed two-day sample in `sample/`.
 ```
 data/
 ├── sample/                           the two-day sample, raw/ and preprocessed/, committed (not used here)
-└── zenodo_1167595/
+└── ZenodoData/
     ├── P1_AIS_Data/
     │   ├── nari_dynamic.csv          AIS positions
     │   ├── nari_static.csv           vessel static data (vessel type)
@@ -251,7 +251,7 @@ data/
 
 | step | command | reads | writes |
 |---|---|---|---|
-| 0 | `python scripts/prepare_zenodo.py --n-jobs -1` (needs `pyarrow`), or notebook `01_preprocessing` with `PREPROCESS_FULL = True` | the raw CSVs from the download | `data/zenodo_1167595/preprocessed/`: columns renamed, "not available" codes as NaN, ranges checked, projected to EPSG:32630, noise removed |
+| 0 | `python scripts/prepare_zenodo.py --n-jobs -1` (needs `pyarrow`), or notebook `01_preprocessing` with `PREPROCESS_FULL = True` | the raw CSVs from the download | `data/ZenodoData/preprocessed/`: columns renamed, "not available" codes as NaN, ranges checked, projected to EPSG:32630, noise removed |
 | 1 | notebook `02_trajectory_annotation`, `DATA = "full"` | `preprocessed/` (AIS, weather, sea state, coastline) | `results/02_trajectory_annotation/full/` |
 | 2 | notebook `03_two_stage_cpls_compression`, `DATA = "full"` | `preprocessed/AIS`, `preprocessed/Coastline` | `results/03_two_stage_cpls_compression/full/` |
 | 3 | notebook `04_cadp_compression`, `DATA = "full"` | `preprocessed/AIS`, `preprocessed/Ocean` | `results/04_cadp_compression/full/` |
@@ -314,5 +314,5 @@ terms.
   <http://www.eea.europa.eu/legal/copyright>
 
 If you publish work that uses this data, cite Ray et al. (2019) above as well.
-The sample in `data/sample/` (two days of AIS, weather and sea state, and the
+The sample in `data/ZenodoData/sample/` (two days of AIS, weather and sea state, and the
 clipped coastline) is cut from the same archive, under the same terms ([`data/LICENSE.md`](../data/LICENSE.md)).

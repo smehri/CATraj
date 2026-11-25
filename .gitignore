@@ -71,11 +71,19 @@ docs/papers/*context-aware approach for vessels*
 #
 # Large, licence-restricted, and regenerated on every run. Only the README
 # that says what belongs in each folder is committed, plus the data licences
-# and the two-day sample in data/sample/ (re-included at the end of this file).
+# and each dataset's sample (data/ZenodoData/sample/ and data/UsAIS/sample/,
+# re-included at the end of this file). Git cannot re-include a file whose
+# parent directory is excluded, so the directories are un-ignored step by step.
 # ---------------------------------------------------------------------------
 data/*
 !data/README.md
 !data/LICENSE.md
+!data/ZenodoData/
+data/ZenodoData/*
+!data/ZenodoData/sample/
+!data/UsAIS/
+data/UsAIS/*
+!data/UsAIS/sample/
 results/*
 !results/README.md
 
@@ -83,7 +91,7 @@ results/*
 # Data files anywhere else
 #
 # Movement and context datasets are large and often licence-restricted, so they
-# are not committed. The sample archives in data/sample/ are the exception: the
+# are not committed. The sample archives in data/*/sample/ are the exception: the
 # tutorials, tests and app point at them out of the box, so they are
 # force-included below. Point tests at small synthetic fixtures rather than
 # adding real data.
@@ -107,8 +115,10 @@ results/*
 *.qix
 
 # The sample datasets the tutorials, tests and app depend on.
-!data/sample/
-!data/sample/**
+!data/ZenodoData/sample/
+!data/ZenodoData/sample/**
+!data/UsAIS/sample/
+!data/UsAIS/sample/**
 
 # CLSTM notebook and its results: kept local until the owner publishes them.
 notebooks/05_clstm_prediction.ipynb

@@ -953,8 +953,8 @@ def preprocess_archive(raw_root, out_root, window=30.0, *, force=False, area=ARE
                        exclude=EXCLUDED_PERIODS, n_jobs=1, log=print):
     """Preprocess every dataset found under ``raw_root``; write to ``out_root``.
 
-    ``raw_root`` is the archive (``data/zenodo_1167595``) or a sample cut from it
-    (``data/sample/raw``). Writes ``AIS/ais.parquet`` (+ ``AIS/mmsi_check.csv``),
+    ``raw_root`` is the archive (``data/ZenodoData``) or a sample cut from it
+    (``data/ZenodoData/sample/raw``). Writes ``AIS/ais.parquet`` (+ ``AIS/mmsi_check.csv``),
     ``Weather/weather.parquet``, ``Ocean/ocean_<month>.parquet``,
     ``Coastline/coastline.parquet`` and ``preprocessing_report.csv`` / ``.txt``.
     A dataset whose raw files are absent is skipped, and so is one whose output

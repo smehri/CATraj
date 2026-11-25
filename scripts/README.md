@@ -5,9 +5,9 @@ with the package installed (`pip install -e ".[dev]"`, see the main README).
 
 | script | what it does |
 |---|---|
-| `download_data.py` | downloads the public Zenodo archive (AIS, weather, sea state, coastline) into `data/zenodo_1167595/`, verifying checksums; `--months all` for every sea-state month ([`docs/getting_the_data.md`](../docs/getting_the_data.md)) |
-| `prepare_zenodo.py` | run after the download: `catraj.preprocessing.preprocess_archive` on the whole archive. Renames the coded columns, sets "not available" codes to NaN, checks ranges, projects to EPSG:32630, median-filters the columns the notebooks use, writes `data/zenodo_1167595/preprocessed/` (Parquet; needs `pyarrow`; `--n-jobs -1` uses every core; `--data` and `--out` choose other folders, as for the sample) |
-| `make_sample.py` | cuts the committed two-day sample `data/sample/raw/` from the downloaded archive (the window, area and sea-state month are options) |
+| `download_data.py` | downloads the public Zenodo archive (AIS, weather, sea state, coastline) into `data/ZenodoData/`, verifying checksums; `--months all` for every sea-state month ([`docs/getting_the_data.md`](../docs/getting_the_data.md)) |
+| `prepare_zenodo.py` | run after the download: `catraj.preprocessing.preprocess_archive` on the whole archive. Renames the coded columns, sets "not available" codes to NaN, checks ranges, projects to EPSG:32630, median-filters the columns the notebooks use, writes `data/ZenodoData/preprocessed/` (Parquet; needs `pyarrow`; `--n-jobs -1` uses every core; `--data` and `--out` choose other folders, as for the sample) |
+| `make_sample.py` | cuts the committed two-day sample `data/ZenodoData/sample/raw/` from the downloaded archive (the window, area and sea-state month are options) |
 | `cadp_on_annotated_fleet.py` | an earlier, standalone run of CADP over an annotated fleet (below) |
 
 The notebooks do the same work with explanations: `01_preprocessing` for the first two, and `04_cadp_compression` for the last.
