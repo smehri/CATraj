@@ -529,3 +529,22 @@ def test_committed_preprocessed_sample():
     coast = gpd.read_parquet(root / "Coastline" / "coastline.parquet")
     assert coast.crs.to_epsg() == 32630 and len(coast) > 0
     assert (root / "preprocessing_report.csv").exists()
+
+
+def test_ocean_file_of_another_month_is_skipped(tmp_path):
+    # The archive's oc_january.csv repeats November: it must not be written as
+    # January.
+    from catraj.preprocessing import ocean_month_matches, preprocess_archive
+    nov = pd.Timestamp("2015-11-15", tz="UTC").timestamp()
+    oc = pd.DataFrame({"unix_time": [nov, nov + 10800]})
+    assert ocean_month_matches(oc, "november")
+    assert not ocean_month_matches(oc, "january")
+    folder = tmp_path / "raw" / "E1_ocean"
+    folder.mkdir(parents=True)
+    (folder / "oc_january.csv").write_text(
+        "lon,lat,dpt,wlv,hs,lm,dir,ts\n"
+        f"-4.5,48.4,100,0.5,1.0,50,180,{int(nov)}\n")
+    report = preprocess_archive(tmp_path / "raw", tmp_path / "out",
+                                months=("january",))
+    assert not (tmp_path / "out" / "Ocean" / "ocean_january.parquet").exists()
+    assert "file skipped" in report.to_text()

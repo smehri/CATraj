@@ -132,6 +132,7 @@ from .mmsi import mmsi_classes
 
 __all__ = [
     "AREA", "ARCHIVE_PERIOD", "CRS", "MONTHS", "PreprocessingReport",
+    "ocean_month_matches",
     "read_ais_raw", "mmsi_check", "drop_invalid_mmsi", "drop_invalid_time",
     "drop_invalid_position", "unavailable_to_nan", "check_ranges",
     "drop_duplicates_and_sort", "drop_position_jumps", "vessel_types",
@@ -852,9 +853,29 @@ def _run_weather(raw: Path, out: Path, window, report):
     return n_in, len(obs)
 
 
-def _run_ocean(src: Path, out: Path, window, area, report):
+def ocean_month_matches(oc, month) -> bool:
+    """True when most of ``oc``'s times fall in ``month`` (a name of :data:`MONTHS`).
+
+    The archive's ``oc_january.csv`` is a byte-for-byte copy of
+    ``oc_november.csv`` (times 2015-11-01 to 2015-11-30): there is no January
+    sea state.  A file whose times are not in its month is skipped, not written
+    under the wrong name.
+    """
+    if len(oc) == 0:
+        return False
+    stamp = pd.to_datetime(oc["unix_time"].median(), unit="s")
+    return stamp.strftime("%B").lower() == month
+
+
+def _run_ocean(src: Path, out: Path, window, area, report, month=None):
     oc = read_ocean_raw(src, report)
     n_in = len(oc)
+    if month is not None and not ocean_month_matches(oc, month):
+        if report is not None:
+            report.add("ocean", "ocean_month_matches",
+                       f"oc_{month}.csv: times not in {month}, file skipped",
+                       n_in, 0, n_in)
+        return None
     oc = drop_invalid_ocean(oc, area, report)
     oc = drop_land_cells(oc, report)
     oc = ocean_unavailable_to_nan(oc, report)
@@ -933,7 +954,8 @@ def preprocess_archive(raw_root, out_root, window=30.0, *, force=False, area=ARE
         src = raw_root / "E1_ocean" / f"oc_{month}.csv"
         jobs.append((f"ocean {month}", [src],
                      out_root / "Ocean" / f"ocean_{month}.parquet",
-                     lambda t, src=src: _run_ocean(src, t, window, area, report)))
+                     lambda t, src=src, month=month: _run_ocean(
+                         src, t, window, area, report, month)))
     jobs.append(("coastline", [shp], out_root / "Coastline" / "coastline.parquet",
                  lambda t: _run_coastline(shp, t, area, report)))
 
@@ -950,6 +972,10 @@ def preprocess_archive(raw_root, out_root, window=30.0, *, force=False, area=ARE
         say(f"{label} ...")
         t0 = time.perf_counter()
         result = run(target)
+        if result is None:
+            say(f"  {label}: skipped, its times are not in its month "
+                "(the archive's oc_january.csv repeats November)")
+            continue
         n = result if isinstance(result, int) else result[1]
         say(f"  {label}: {n:,} rows -> {target} ({time.perf_counter() - t0:.1f} s)")
         done += 1
