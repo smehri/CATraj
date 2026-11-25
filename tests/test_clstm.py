@@ -457,8 +457,55 @@ def test_clstm_learns_each_types_deviation():
     }
     mean = {k: v.loc["all", "mean_error"] for k, v in errors.items()}
     print("mean point-wise error", mean)
+    print("r1 = clstm/curvilinear %.4f (< 0.3), r2 = clstm/lstm %.4f (< 0.5)"
+          % (mean["clstm"] / mean["curvilinear"], mean["clstm"] / mean["lstm"]))
     assert mean["clstm"] < 0.3 * mean["curvilinear"]
     assert mean["clstm"] < 0.5 * mean["lstm"]
+
+
+@pytest.mark.torch
+def test_target_defaults_to_the_deviation_and_is_validated():
+    pytest.importorskip("torch")
+    assert _predictor().target == "deviation"
+    assert _predictor(target="absolute").target == "absolute"
+    with pytest.raises(ValueError, match="target"):
+        _predictor(target="relative")
+
+
+@pytest.mark.torch
+def test_deviation_on_dead_reckoning_data_predicts_the_curvilinear_positions():
+    pytest.importorskip("torch")
+    # The true motion IS dead reckoning here: the deviation is zero, so the
+    # prediction must be T' (within a metre), whatever the training.
+    rng = np.random.default_rng(5)
+    frames = []
+    for i in range(20):
+        n, dt = 40, 5.0
+        speed, course = rng.uniform(3.0, 8.0), rng.uniform(0.0, 360.0)
+        k = np.arange(n)
+        x = 4e5 + rng.uniform(-1e3, 1e3) + k * dt * speed * np.sin(np.radians(course))
+        y = 5.3e6 + rng.uniform(-1e3, 1e3) + k * dt * speed * np.cos(np.radians(course))
+        frames.append(_frame(dt * k, x, y, speed / KNOT, course, vessel_type="A", ident=f"v{i}"))
+    samples = _make(pd.concat(frames), context_column="type", by="id")
+    train, test = split_by_trajectory(samples, test_size=0.25, seed=0)
+    fitted = _predictor(max_epochs=20, batch_size=32).fit(train)
+    pred = fitted.predict(test)
+    assert np.abs(pred - test.curvilinear).max() < 1.0
+    absolute = _predictor(max_epochs=20, batch_size=32, target="absolute").fit(train)
+    # the absolute network cannot match that precision on coordinates of ~5e6 m
+    assert np.abs(absolute.predict(test) - test.curvilinear).max() > 1.0
+
+
+@pytest.mark.torch
+def test_absolute_target_still_works_and_differs_from_the_deviation():
+    pytest.importorskip("torch")
+    _, test = _synthetic_fleet()
+    a = _tiny_fit(target="absolute")
+    d = _tiny_fit()
+    pa, pd_ = a.predict(test), d.predict(test)
+    assert pa.shape == pd_.shape == test.targets.shape and np.isfinite(pa).all()
+    assert not np.array_equal(pa, pd_)
+    assert "absolute" in a.summary() and "deviation" in d.summary()
 
 
 @pytest.mark.torch
@@ -486,6 +533,25 @@ def test_save_and_load_give_the_same_predictions(tmp_path):
     assert loaded.history_ == fitted.history_
     assert loaded.summary() == fitted.summary()
     assert loaded.hidden_size == 64 and loaded.min_samples == 300
+    assert loaded.target == fitted.target == "deviation"
+
+
+@pytest.mark.torch
+def test_save_and_load_keep_the_absolute_target_and_read_old_files(tmp_path):
+    torch = pytest.importorskip("torch")
+    _, test = _synthetic_fleet()
+    fitted = _tiny_fit(target="absolute", min_samples=300)
+    path = tmp_path / "abs.pt"
+    fitted.save(path)
+    loaded = ClstmPredictor.load(path, device="cpu")
+    assert loaded.target == "absolute"
+    np.testing.assert_array_equal(fitted.predict(test), loaded.predict(test))
+    # a file written before the option existed has no "target": absolute
+    payload = torch.load(path, map_location="cpu", weights_only=True)
+    del payload["config"]["target"]
+    old = tmp_path / "old.pt"
+    torch.save(payload, old)
+    assert ClstmPredictor.load(old, device="cpu").target == "absolute"
 
 
 @pytest.mark.torch

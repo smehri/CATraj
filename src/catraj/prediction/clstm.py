@@ -16,10 +16,21 @@ import it inside the functions that use it, so importing this module does not.
 Decided with the author (2026-11-24)
 ------------------------------------
 
-* **C1. Input and output exactly as Eqs. 21 and 22.**  A sample is a sequence
-  of three steps; step j is ``(x'_{t+j}, y'_{t+j}, tau_j)``.  The output is the
-  three absolute positions ``(x_{t+j}, y_{t+j})``.  No observed history, no
-  relative coordinates.
+* **C1. Input exactly as Eq. 21; what the network learns changed on
+  2026-11-25.**  A sample is a sequence of three steps; step j is
+  ``(x'_{t+j}, y'_{t+j}, tau_j)``; no observed history.  The final output of
+  :meth:`ClstmPredictor.predict` is always the three absolute positions
+  ``(x_{t+j}, y_{t+j})``.  As first decided, the network regressed those
+  absolute positions (``target="absolute"``).  Changed with the author on
+  2026-11-25 to ``target="deviation"`` (the default): the network learns the
+  deviation ``delta = actual - T'`` of Eq. 2 and ``predict`` returns
+  ``T' + delta_hat``.  Reason: absolute UTM coordinates standardised over the
+  whole area have a standard deviation of tens of kilometres, so a network
+  that reaches a standardised RMSE of 1.7e-3 is still about 70 m off, more
+  than the curvilinear error over a horizon of seconds.  Measured on the full
+  archive (clean Cargo, 1.03 million training samples, 30 epochs, mean /
+  median point-wise error on held-out trips): curvilinear 59.2 / 15.6 m,
+  absolute 95.5 / 52.2 m, deviation 60.8 / 18.4 m.
 * **C2. One network per vessel type**, plus the ordinary LSTM as the same
   class with no context.
 * **C3. PyTorch**, as the optional extra ``catraj[predict]``.
@@ -56,9 +67,11 @@ Decided here
 * **H1. Architecture.**  ``LSTM(3, 64, 1, batch_first=True)`` over the three
   steps, then ``Linear(64, 2)`` on each step's hidden state.  Zero initial
   states; PyTorch's default weight initialisation.
-* **H2. Scaling.**  Per network, every input feature and every output
-  coordinate is standardised with the mean and standard deviation of that
-  network's training samples, stored and inverted on prediction.
+* **H2. Scaling.**  Per network, every input feature and every learned
+  target coordinate (the absolute position, or with ``target="deviation"``
+  the deviation ``delta``) is standardised with the mean and standard
+  deviation of that network's training samples, stored and inverted on
+  prediction.
 * **H3. Loss.**  Mean squared error on the standardised outputs.
 * **H4. Optimiser.**  Adam, learning rate 1e-3, batch size 256, at most 200
   epochs.
@@ -496,6 +509,11 @@ class ClstmPredictor:
         The LSTM of H1.
     lr, batch_size, max_epochs : float, int, int
         Adam and its schedule (H4).
+    target : {"deviation", "absolute"}
+        What the network learns (C1): ``"deviation"`` (default) the difference
+        between the actual positions and the curvilinear ones, to which
+        ``predict`` adds the curvilinear positions back; ``"absolute"`` the
+        absolute positions.  Either way ``predict`` returns absolute positions.
     patience, validation_size : int, float
         Early stopping (H5): the epochs without improvement that end the
         training, and the share of the training trajectories held out.
@@ -524,12 +542,17 @@ class ClstmPredictor:
     """
 
     _CONFIG = ("context", "hidden_size", "num_layers", "lr", "batch_size",
-               "max_epochs", "patience", "validation_size", "min_samples", "seed")
+               "max_epochs", "patience", "validation_size", "min_samples", "seed",
+               "target")
 
     def __init__(self, *, context=True, hidden_size=64, num_layers=1, lr=1e-3,
                  batch_size=256, max_epochs=200, patience=10,
-                 validation_size=0.1, min_samples=200, seed=0, device="auto"):
+                 validation_size=0.1, min_samples=200, seed=0, device="auto",
+                 target="deviation"):
         torch = _torch()
+        if target not in ("deviation", "absolute"):
+            raise ValueError("target must be 'deviation' or 'absolute'")
+        self.target = target
         self.context = bool(context)
         self.hidden_size = int(hidden_size)
         self.num_layers = int(num_layers)
@@ -591,9 +614,12 @@ class ClstmPredictor:
             train_idx = np.flatnonzero(~in_val)
             val_idx = torch.as_tensor(np.flatnonzero(in_val), device=device)
         # H2: the scalers come from the training trajectories only.
-        scaler = _scaler(part.inputs[train_idx], part.targets[train_idx])
+        learned = part.targets
+        if self.target == "deviation":  # Eq. 2: delta = actual - T'
+            learned = part.targets - part.curvilinear
+        scaler = _scaler(part.inputs[train_idx], learned[train_idx])
         x = (part.inputs - scaler["in_mean"]) / scaler["in_std"]
-        y = (part.targets - scaler["out_mean"]) / scaler["out_std"]
+        y = (learned - scaler["out_mean"]) / scaler["out_std"]
         x = torch.as_tensor(x, dtype=torch.float32, device=device)
         y = torch.as_tensor(y, dtype=torch.float32, device=device)
         train_idx = torch.as_tensor(train_idx, device=device)
@@ -621,7 +647,13 @@ class ClstmPredictor:
             if val_idx is not None:
                 net.eval()
                 with torch.no_grad():
-                    val_loss = float(loss_fn(net(x[val_idx]), y[val_idx]))
+                    # In chunks: the whole validation set at once would not fit
+                    # on a GPU with millions of samples.
+                    sq = torch.zeros((), dtype=torch.float64, device=device)
+                    for v in range(0, len(val_idx), _PREDICT_BATCH):
+                        rows = val_idx[v:v + _PREDICT_BATCH]
+                        sq += ((net(x[rows]) - y[rows]) ** 2).sum(dtype=torch.float64)
+                    val_loss = float(sq) / y[val_idx[:1]].numel() / len(val_idx)
                 if val_loss < best:
                     best, stale = val_loss, 0
                     best_state = copy.deepcopy(net.state_dict())
@@ -660,7 +692,10 @@ class ClstmPredictor:
                 x = torch.as_tensor(x, dtype=torch.float32, device=device)
                 with torch.no_grad():
                     z = net(x).cpu().numpy().astype(np.float64)
-                out[sel] = z * scaler["out_std"] + scaler["out_mean"]
+                z = z * scaler["out_std"] + scaler["out_mean"]
+                if self.target == "deviation":  # T' + delta_hat
+                    z = z + samples.inputs[sel][..., :2]
+                out[sel] = z
         return out
 
     def _check_fitted(self):
@@ -694,7 +729,8 @@ class ClstmPredictor:
         """Read a predictor written by :meth:`save`, onto ``device``."""
         torch = _torch()
         payload = torch.load(path, map_location="cpu", weights_only=True)
-        self = cls(device=device, **payload["config"])
+        config = {"target": "absolute", **payload["config"]}  # files before 2026-11-25
+        self = cls(device=device, **config)
         for name, entry in payload["networks"].items():
             net = _network(torch, self.hidden_size, self.num_layers)
             net.load_state_dict(entry["state_dict"])
@@ -717,7 +753,7 @@ class ClstmPredictor:
         if not self._fitted:
             return "ClstmPredictor (not fitted)"
         kind = "CLSTM, one network per group" if self.context else "LSTM, one network"
-        lines = [f"{kind}; device {self.device}"]
+        lines = [f"{kind}; learns the {self.target}; device {self.device}"]
         for name in self.groups_:
             info = self._info[name]
             best = info["best_validation_loss"]
