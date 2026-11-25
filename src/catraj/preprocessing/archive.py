@@ -126,7 +126,10 @@ Output of :func:`preprocess_archive`
 ``AIS/ais.parquet`` (+ ``AIS/mmsi_check.csv``, the MMSI classes found),
 ``Weather/weather.parquet``, ``Ocean/ocean_<month>.parquet``,
 ``Coastline/coastline.parquet`` (GeoParquet), ``preprocessing_report.csv`` and
-``.txt``. A dataset whose raw files are absent is skipped.
+``.txt``. A dataset whose raw files are absent is skipped. ``n_jobs`` spreads
+the independent work over processes (weather, each month of sea state and the
+coastline; then the AIS filter per batch of whole vessels) and changes nothing
+in the files or the report.
 """
 
 from __future__ import annotations
@@ -137,6 +140,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+from .._parallel import resolve_n_jobs, run_parallel
 from .filtering import denoise, rolling_filter
 from .mmsi import mmsi_classes
 
@@ -539,41 +543,54 @@ def _vessel_batches(mmsi, batch_rows):
         start = stop
 
 
-def iter_denoised_ais(ais, window=30.0, batch_rows=BATCH_ROWS):
-    """:func:`denoise_ais` in batches of whole vessels, to bound memory.
-
-    ``ais`` must be sorted by ``mmsi``. Yields one frame per batch.
-    """
+def _denoise_batch(b, window):
+    """One batch of whole vessels, median-filtered (what a worker process runs)."""
     import geopandas as gpd
     from pyproj import Transformer
 
     inv = Transformer.from_crs(CRS, 4326, always_xy=True)
-    for start, stop in _vessel_batches(ais["mmsi"].to_numpy(), batch_rows):
-        b = ais.iloc[start:stop]
-        if "x" not in b.columns:
-            b = project(b)
-        else:
-            b = b.copy()
-        gdf = gpd.GeoDataFrame(b, geometry=gpd.points_from_xy(b.x, b.y), crs=CRS)
-        gdf = denoise(gdf, window, by="mmsi", time_column="unix_time",
-                      columns=AIS_FILTERED, circular=AIS_CIRCULAR)
-        b["x"], b["y"] = gdf.geometry.x.to_numpy(), gdf.geometry.y.to_numpy()
-        b["lon"], b["lat"] = inv.transform(b.x.to_numpy(), b.y.to_numpy())
-        for c in AIS_FILTERED:
-            v = gdf[c].to_numpy().astype("float32")
-            if c in AIS_CIRCULAR:          # float32 rounds 359.99997 up to 360
-                v[v >= np.float32(360)] = 0
-            b[c] = v
-        yield b
+    if "x" not in b.columns:
+        b = project(b)
+    else:
+        b = b.copy()
+    gdf = gpd.GeoDataFrame(b, geometry=gpd.points_from_xy(b.x, b.y), crs=CRS)
+    gdf = denoise(gdf, window, by="mmsi", time_column="unix_time",
+                  columns=AIS_FILTERED, circular=AIS_CIRCULAR)
+    b["x"], b["y"] = gdf.geometry.x.to_numpy(), gdf.geometry.y.to_numpy()
+    b["lon"], b["lat"] = inv.transform(b.x.to_numpy(), b.y.to_numpy())
+    for c in AIS_FILTERED:
+        v = gdf[c].to_numpy().astype("float32")
+        if c in AIS_CIRCULAR:          # float32 rounds 359.99997 up to 360
+            v[v >= np.float32(360)] = 0
+        b[c] = v
+    return b
 
 
-def denoise_ais(ais, window=30.0, report=None) -> pd.DataFrame:
+def iter_denoised_ais(ais, window=30.0, batch_rows=BATCH_ROWS, n_jobs=1):
+    """:func:`denoise_ais` in batches of whole vessels, to bound memory.
+
+    ``ais`` must be sorted by ``mmsi``. Yields one frame per batch, in order.
+    Vessels are independent, so with ``n_jobs`` other than 1 the batches are
+    filtered on that many processes (``-1``: every core), ``n_jobs`` batches at
+    a time; the frames are the same as a serial run's. Memory: each worker
+    holds one batch (``batch_rows`` rows) and its filtered copy.
+    """
+    batches = list(_vessel_batches(ais["mmsi"].to_numpy(), batch_rows))
+    workers = resolve_n_jobs(n_jobs, len(batches))
+    for first in range(0, len(batches), workers):
+        wave = batches[first:first + workers]
+        tasks = [(ais.iloc[start:stop], window) for start, stop in wave]
+        yield from run_parallel(_denoise_batch, tasks, n_jobs=workers)
+
+
+def denoise_ais(ais, window=30.0, report=None, n_jobs=1) -> pd.DataFrame:
     """Median-filter positions, speed, course and heading per vessel.
 
     ``x`` and ``y`` (projected, see :func:`project`) are filtered, ``lon`` and
     ``lat`` recomputed from them. ``ais`` must be sorted by ``mmsi`` and time.
+    ``n_jobs`` as in :func:`iter_denoised_ais`.
     """
-    parts = list(iter_denoised_ais(ais, window))
+    parts = list(iter_denoised_ais(ais, window, n_jobs=n_jobs))
     out = pd.concat(parts, ignore_index=True) if parts else ais.iloc[:0].copy()
     if report is not None:
         report.add("AIS", "denoise_ais", f"median filter, {window:g} s window",
@@ -843,7 +860,7 @@ def _to_parquet(df, path: Path) -> None:
 
 
 def _run_ais(raw: Path, out: Path, window, area, report, batch_rows, max_speed,
-             exclude=EXCLUDED_PERIODS):
+             exclude=EXCLUDED_PERIODS, n_jobs=1):
     folder = raw / "P1_AIS_Data"
     ais = read_ais_raw(folder / "nari_dynamic.csv", report)
     mmsi_check(ais).to_csv(out.with_name("mmsi_check.csv"), index=False)
@@ -861,7 +878,7 @@ def _run_ais(raw: Path, out: Path, window, area, report, batch_rows, max_speed,
         ais = attach_vessel_types(ais, static, types, report)
     sink, n_out = _ParquetSink(out), 0
     try:
-        for part in iter_denoised_ais(ais, window, batch_rows):
+        for part in iter_denoised_ais(ais, window, batch_rows, n_jobs):
             sink.write(part)
             n_out += len(part)
     except BaseException:
@@ -933,7 +950,7 @@ def _run_coastline(src: Path, out: Path, area, report):
 
 def preprocess_archive(raw_root, out_root, window=30.0, *, force=False, area=AREA,
                        months=MONTHS, batch_rows=BATCH_ROWS, max_speed_knots=50,
-                       exclude=EXCLUDED_PERIODS, log=print):
+                       exclude=EXCLUDED_PERIODS, n_jobs=1, log=print):
     """Preprocess every dataset found under ``raw_root``; write to ``out_root``.
 
     ``raw_root`` is the archive (``data/zenodo_1167595``) or a sample cut from it
@@ -962,6 +979,14 @@ def preprocess_archive(raw_root, out_root, window=30.0, *, force=False, area=ARE
     exclude : sequence of (first, last, reason) or None
         Periods dropped from every dataset (default :data:`EXCLUDED_PERIODS`,
         January 2016); ``()`` keeps everything.
+    n_jobs : int or None
+        Processes to use (scikit-learn convention: ``1`` or ``None`` serial in
+        this process, ``-1`` every core). Weather, each month of sea state and
+        the coastline are independent and run side by side; then the AIS
+        median filter runs per batch of whole vessels on that many processes.
+        The files and the report are identical to a serial run's. Memory: each
+        sea-state month in flight holds its table (about 1-2 GB on the full
+        archive) and each AIS worker one batch (``batch_rows`` rows).
     log : callable or None
         Called with each progress line; ``None`` is silent.
 
@@ -977,46 +1002,72 @@ def preprocess_archive(raw_root, out_root, window=30.0, *, force=False, area=ARE
     if not window > 0:
         raise ValueError("window must be positive")
     say = log if log is not None else (lambda *_: None)
-    report = PreprocessingReport()
     ais = raw_root / "P1_AIS_Data" / "nari_dynamic.csv"
     wdir = raw_root / "E2_Weather_Conditions"
     shp = raw_root / "C2_European_Coastline" / "Europe Coastline (Polygone).shp"
-    jobs = [("AIS", [ais], out_root / "AIS" / "ais.parquet",
-             lambda t: _run_ais(raw_root, t, window, area, report, batch_rows,
-                                  max_speed_knots, exclude)),
+    # (label, raw files needed, target, kind, keyword arguments of the run)
+    jobs = [("AIS", [ais], out_root / "AIS" / "ais.parquet", "ais",
+             dict(raw=raw_root, window=window, area=area, batch_rows=batch_rows,
+                  max_speed=max_speed_knots, exclude=exclude, n_jobs=n_jobs)),
             ("weather", [wdir / "table_wheatherObservation.csv",
                          wdir / "table_weatherStation.csv"],
-             out_root / "Weather" / "weather.parquet",
-             lambda t: _run_weather(raw_root, t, window, report, exclude))]
+             out_root / "Weather" / "weather.parquet", "weather",
+             dict(raw=raw_root, window=window, exclude=exclude))]
     for month in months:
         src = raw_root / "E1_ocean" / f"oc_{month}.csv"
         jobs.append((f"ocean {month}", [src],
-                     out_root / "Ocean" / f"ocean_{month}.parquet",
-                     lambda t, src=src, month=month: _run_ocean(
-                         src, t, window, area, report, month, exclude)))
+                     out_root / "Ocean" / f"ocean_{month}.parquet", "ocean",
+                     dict(src=src, window=window, area=area, month=month,
+                          exclude=exclude)))
     jobs.append(("coastline", [shp], out_root / "Coastline" / "coastline.parquet",
-                 lambda t: _run_coastline(shp, t, area, report)))
+                 "coastline", dict(src=shp, area=area)))
 
-    done = 0
-    for label, needs, target, run in jobs:
+    todo = []
+    for job in jobs:
+        label, needs, target = job[:3]
         missing = [p for p in needs if not p.exists()]
         if missing:
             say(f"skip {label}: raw file absent ({missing[0]})")
-            continue
-        if target.exists() and not force:
+        elif target.exists() and not force:
             say(f"skip {label}: {target} exists (force=True to rebuild)")
-            continue
-        target.parent.mkdir(parents=True, exist_ok=True)
-        say(f"{label} ...")
-        t0 = time.perf_counter()
-        result = run(target)
+        else:
+            todo.append(job)
+
+    def finish(job, outcome):
+        label, target = job[0], job[2]
+        reports[label] = outcome[2]
+        result, seconds = outcome[:2]
         if result is None:
             say(f"  {label}: skipped, its times are not in its month "
                 "(the archive's oc_january.csv repeats November)")
-            continue
+            return 0
         n = result if isinstance(result, int) else result[1]
-        say(f"  {label}: {n:,} rows -> {target} ({time.perf_counter() - t0:.1f} s)")
-        done += 1
+        say(f"  {label}: {n:,} rows -> {target} ({seconds:.1f} s)")
+        return 1
+
+    reports, done = {}, 0
+    if resolve_n_jobs(n_jobs, len(todo)) == 1:
+        for job in todo:
+            say(f"{job[0]} ...")
+            done += finish(job, _execute(job[3], job[2], job[4]))
+    else:
+        # Phase 1: the small datasets side by side. Phase 2: the AIS, whose
+        # batches use the processes themselves (no pool inside a pool).
+        small = [j for j in todo if j[3] != "ais"]
+        for job in small:
+            say(f"{job[0]} ... (in parallel)")
+        outcomes = run_parallel(_execute, [(j[3], j[2], j[4]) for j in small],
+                                n_jobs=n_jobs)
+        for job, outcome in zip(small, outcomes):
+            done += finish(job, outcome)
+        for job in todo:
+            if job[3] == "ais":
+                say(f"{job[0]} ... ({resolve_n_jobs(n_jobs)} processes)")
+                done += finish(job, _execute(job[3], job[2], job[4]))
+
+    report = PreprocessingReport()
+    for job in todo:                     # in the serial order, whatever ran first
+        report.extend(reports[job[0]])
     if done:
         out_root.mkdir(parents=True, exist_ok=True)
         frame = report.to_frame()
@@ -1024,3 +1075,27 @@ def preprocess_archive(raw_root, out_root, window=30.0, *, force=False, area=ARE
         (out_root / "preprocessing_report.txt").write_text(
             report.to_text() + "\n", encoding="utf-8")
     return report
+
+
+def _execute(kind, target, kw):
+    """Run one dataset's preprocessing: ``(result, seconds, its PreprocessingReport)``.
+
+    Module-level, with plain arguments, so that a worker process can run it.
+    """
+    import time
+
+    report = PreprocessingReport()
+    target.parent.mkdir(parents=True, exist_ok=True)
+    t0 = time.perf_counter()
+    if kind == "ais":
+        result = _run_ais(kw["raw"], target, kw["window"], kw["area"], report,
+                          kw["batch_rows"], kw["max_speed"], kw["exclude"],
+                          kw["n_jobs"])
+    elif kind == "weather":
+        result = _run_weather(kw["raw"], target, kw["window"], report, kw["exclude"])
+    elif kind == "ocean":
+        result = _run_ocean(kw["src"], target, kw["window"], kw["area"], report,
+                            kw["month"], kw["exclude"])
+    else:
+        result = _run_coastline(kw["src"], target, kw["area"], report)
+    return result, time.perf_counter() - t0, report

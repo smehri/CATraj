@@ -29,6 +29,7 @@ Usage, from the repository root, in the ``catraj`` environment (it needs
     python scripts/prepare_zenodo.py                  # everything that was downloaded
     python scripts/prepare_zenodo.py --force          # rebuild files that exist
     python scripts/prepare_zenodo.py --window 60      # another window, in seconds
+    python scripts/prepare_zenodo.py --n-jobs -1      # every core (1: serial, the default)
     python scripts/prepare_zenodo.py --data data/sample/raw --out data/sample/preprocessed
 
 An output that already exists is skipped unless ``--force``; a dataset whose raw
@@ -64,7 +65,13 @@ def main(argv: list[str] | None = None) -> int:
                         help="width of the median window, in seconds (default: 30)")
     parser.add_argument("--force", action="store_true",
                         help="rebuild outputs that already exist")
+    parser.add_argument("--n-jobs", type=int, default=1,
+                        help="processes: 1 serial (default), -1 every core; weather, "
+                             "each sea-state month and the coastline run side by "
+                             "side, then the AIS filter per batch of vessels")
     args = parser.parse_args(argv)
+    if args.n_jobs == 0 or args.n_jobs < -1:
+        parser.error("--n-jobs must be -1 or a positive integer")
     if not args.window > 0:
         parser.error("--window must be positive")
     if importlib.util.find_spec("pyarrow") is None:
@@ -73,9 +80,11 @@ def main(argv: list[str] | None = None) -> int:
     from catraj.preprocessing import preprocess_archive
 
     out = args.out if args.out is not None else args.data / "preprocessed"
-    print(f"{args.data} -> {out}  (median window {args.window:g} s)")
+    print(f"{args.data} -> {out}  (median window {args.window:g} s, "
+          f"n_jobs {args.n_jobs})")
     t0 = time.perf_counter()
-    report = preprocess_archive(args.data, out, args.window, force=args.force)
+    report = preprocess_archive(args.data, out, args.window, force=args.force,
+                               n_jobs=args.n_jobs)
     if len(report):
         print(f"\n{report.to_text()}")
         print(f"\nreport: {out / 'preprocessing_report.csv'}")

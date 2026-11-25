@@ -565,3 +565,47 @@ def test_january_2016_is_excluded_by_default():
     assert "January 2016" in EXCLUDED_PERIODS[0][2]
     assert len(drop_excluded_periods(df, ())) == len(df)
     assert len(drop_excluded_periods(df, None)) == len(df)
+
+
+# ---- n_jobs: parallel equals serial ----------------------------------------------------------
+
+def test_denoise_ais_in_parallel_equals_serial():
+    from catraj.preprocessing import iter_denoised_ais
+    rows = []
+    for mmsi in range(SHIP, SHIP + 5):
+        for i in range(40):
+            rows.append((mmsi, T0 + 10 * i, -4.5 + 1e-4 * i + (3e-4 if i % 7 == 0 else 0),
+                         48.4, 5.0 + i % 3, 90.0 + i % 5, 90.0))
+    ais = pd.DataFrame(rows, columns=["mmsi", "unix_time", "lon", "lat",
+                                      "speed_over_ground", "course_over_ground",
+                                      "true_heading"])
+    serial = list(iter_denoised_ais(ais, 30, batch_rows=60))
+    parallel = list(iter_denoised_ais(ais, 30, batch_rows=60, n_jobs=2))
+    assert len(serial) == len(parallel) > 2             # several batches, in order
+    for a, b in zip(serial, parallel):
+        pd.testing.assert_frame_equal(a, b)
+    whole = denoise_ais(ais, 30, n_jobs=2)
+    pd.testing.assert_frame_equal(whole, pd.concat(serial, ignore_index=True))
+
+
+def test_preprocess_archive_in_parallel_equals_serial(processed, tmp_path):
+    raw, out, serial_report = processed
+    par = tmp_path / "par"
+    messages = []
+    report = preprocess_archive(raw, par, window=30, n_jobs=2, batch_rows=30,
+                                log=messages.append)
+    assert any("in parallel" in m for m in messages)
+    pd.testing.assert_frame_equal(report.to_frame(), serial_report.to_frame())
+    assert (par / "preprocessing_report.txt").read_text() == (
+        out / "preprocessing_report.txt").read_text()
+    for name in ("AIS/ais.parquet", "Weather/weather.parquet",
+                 "Ocean/ocean_november.parquet"):
+        pd.testing.assert_frame_equal(pd.read_parquet(par / name),
+                                      pd.read_parquet(out / name))
+    import geopandas as gpd
+    assert gpd.read_parquet(par / "Coastline" / "coastline.parquet").equals(
+        gpd.read_parquet(out / "Coastline" / "coastline.parquet"))
+    assert (par / "AIS" / "mmsi_check.csv").read_text() == (
+        out / "AIS" / "mmsi_check.csv").read_text()
+    with pytest.raises(ValueError):
+        preprocess_archive(raw, par, n_jobs=0, force=True, log=None)
