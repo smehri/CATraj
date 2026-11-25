@@ -118,54 +118,49 @@ vertices: no other point of a stay run is ever kept.
 
 Against the *raw* track the guarantee is weaker, by design: the collapsed
 track moves each stay's points to the centroid, by up to the stay's extent.
-Measured on the 24-hour sample at 100 m / 600 s (about 5,100 final
-units), with each unit's raw sub-path against its chord, no unit crosses a
-barrier its raw sub-path does not, and the barrier relations differ in 4
-(DE-9IM) and 5 (direction) units, all at a stay; 125 new and 230 lost
-self-intersections are all at a stay; one unit inverts, at a stay.  The
-collapsed track is the reference the algorithm keeps; the raw one is not.
+A unit's raw sub-path can therefore differ from its chord in its barrier
+relations, its self-intersections and its inversions, and only at a stay.
+The collapsed track is the reference the algorithm keeps; the raw one is not.
+(These differences were counted on an earlier, 24-hour sample; they have not
+been re-counted on the two-day sample, so no figures are quoted.)
 
 A unit of one segment of the collapsed track is never a candidate, so it is
 never tested against the unit before it for inversion; it is the only
 exemption, and the only way a unit pair can invert against the collapsed
-track (34 pairs on the sample, none at a stay).
+track.
 
 What it costs
 -------------
 
 Collapsing stays removes the jitter that makes plain CPLS keep so many points,
-if the stays are found.  On the 24-hour sample (106,894 points, 136 vessels,
-the sample coastline, ``epsilon`` 1000 m, ``speed_epsilon`` 1.54 m/s, all
-five relations on):
+if the stays are found.  On the two-day sample (2015-11-09 and 10: 237,318
+positions of 565 vessels, one trajectory per vessel, the sample coastline,
+``epsilon`` 1000 m, ``speed_epsilon`` 1.54 m/s, all five relations on, one
+core), counting a stay as a run of consecutive stay points, status alone finds
+56 stays (12,436 points) and movement detection added (100 m / 600 s) 242
+(122,746 points).  On the first 60 vessels by MMSI (33,943 positions):
 
 =============================================  ========  =======
 setting                                        kept      seconds
 =============================================  ========  =======
-plain CPLS                                       43,074       46
-2stage, status only (19 stays, 3,902 points)     44,369       46
-2stage, status + 50 m / 300 s (121 stays)         5,107       14
-2stage, status + 100 m / 600 s (98 stays)         5,228       14
-2stage, status + 200 m / 900 s (92 stays)         5,217       10
-100 m / 600 s, self-intersection and
-inversion off                                     4,288        1
+plain CPLS                                       19,099       13
+2stage, status only                              19,282       12
+2stage, status + 100 m / 600 s                    3,120        3
 =============================================  ========  =======
 
-With the default filter (positions 30 s median, speed series 30 s median), at
-100 m / 600 s the same sample keeps 4,759 points (3,593 speed breakpoints, 194
-stay ends, 47 Douglas--Peucker, 925 topology; 97 stays), in about 10 s; plain CPLS
-keeps 35,020 (barrier relations alone 604).  Filtering the positions but not
-the speed series (``speed_window=None``) keeps 12,006, 11,009 of them speed
-breakpoints: consecutive points that fall in the same window get the same
-filtered position, so the central-difference speed swings between zero and
-double, and the speed series needs the filter too (see
-:mod:`catraj.preprocessing.filtering`).  The unfiltered rows above were
-measured with ``filter_window=None``.
+On the whole sample, with movement detection (status + 100 m / 600 s),
+2stage-CPLS keeps 16,889 of 237,318 points in 35 s with ``filter_window=None``
+and 15,674 in 37 s with the default filter (positions 30 s median, speed
+series 30 s median); plain CPLS did not finish on the whole sample in 10
+minutes (barrier relations alone keep 2,457 points, 163 s).  The unfiltered
+rows above were measured with ``filter_window=None``.  Without the filter on
+the speed series (``speed_window=None``) the speed series swings between zero
+and double where consecutive points fall in the same window, so the speed
+series needs the filter too (see :mod:`catraj.preprocessing.filtering`).
 
 Status alone finds little: most moored vessels in the sample do not report
 "at anchor", so the jitter that costs the points is mostly not found.
-Movement detection finds it.  What remains is mostly the self-intersection
-relations (925 of the 963 points stage 2 added at 100 m / 600 s) and the
-4,000 or so speed breakpoints.  Seconds are single-threaded wall time.
+Movement detection finds it.  Seconds are single-threaded wall time.
 
 References
 ----------

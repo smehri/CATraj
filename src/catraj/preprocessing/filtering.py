@@ -70,66 +70,52 @@ What it costs, and what it does
 
 The statistics are computed on padded blocks of windows, found with
 ``np.searchsorted``, so the cost is the number of points times the points per
-window.  On the 24-hour sample (106,894 points, 136 vessels, positions and
-speed over ground filtered, 8,602 "not available" speeds set to NaN first)
-filtering takes about 0.25 seconds.
+window.  On the two-day sample (2015-11-09 and 10: 237,318 positions of 565
+vessels after the range, duplicate and jump checks, before the filter; one
+core) filtering the positions, speed, course and heading with the default 30
+second median takes 0.4 seconds.  It moves the median point by 0.0 m (95th
+percentile 25 m, maximum 305 m).
 
 Compressed afterwards with 2stage-CPLS (``epsilon`` 1000 m, ``speed_epsilon``
-1.54 m/s, status, 100 m / 600 s stays, all five relations).  The positions
-are filtered as in the first two columns; the third is the number of points
-kept when the speed series is *not* filtered (``speed_window=None``), the
-fourth when it is filtered with the same window, as the default does (P2 of
-:mod:`..compression.two_stage`):
+1.54 m/s, status, 100 m / 600 s stays, all five relations, one trajectory per
+vessel), the whole sample keeps 16,889 of the 237,318 points when nothing is
+filtered (``filter_window=None``, 35 s) and 15,674 with the default filter
+(median 30 s on the positions and on the speed series, 37 s).
 
-======  ======  =========  =========  =============  ========================
-filter  window  kept,      kept,      repeated       displacement from
-                speed raw  speed      positions      raw, m (median / 95th
-                           filtered                  percentile / maximum)
-======  ======  =========  =========  =============  ========================
-none            5,228      5,228      9,200          0
-median  30      12,006     4,759      16,171         0.0 / 21.8 / 155
-median  60      18,239     4,756      20,764         0.5 / 44.7 / 303
-median  120     16,382     3,341      20,916         0.7 / 75.6 / 648
-mean    30      11,220     4,048      7,200          0.5 / 18.2 / 129
-mean    60      17,135     3,894      13,780         1.6 / 38.8 / 231
-mean    120     15,794     2,795      8,648          2.2 / 63.8 / 509
-======  ======  =========  =========  =============  ========================
+Why the speed series is filtered too: consecutive points whose windows hold the
+same points get the same filtered position (the sample has repeated times and
+irregular sampling), and the central-difference speed then swings between zero
+and double, so Douglas--Peucker on that series would keep most of its points.
+That is why 2stage-CPLS also filters the speed series, with the same window
+(P2 of :mod:`..compression.two_stage`).  The default keeps fewer points than
+the unfiltered run, as the figures above show.  The effect depends on the
+statistic and the window; it was not re-measured for other windows or for the
+mean on the two-day sample.
 
-"Repeated positions" are consecutive points of one vessel at exactly the same
-position.
-
-Why filtering the positions alone raises the number of speed breakpoints:
-consecutive points whose windows hold the same points get the same filtered
-position (the sample has repeated times and irregular sampling), so repeated
-positions rise from 9,200 raw to 20,764 (median, 60 s) and 13,780 (mean, 60
-s), and the central-difference speed then swings between zero and double.
-Douglas--Peucker on that series keeps most of its points.  That is why
-2stage-CPLS also filters the speed series, with the same window: the default
-(median 30 s on both) keeps 4,759 points, fewer than the 5,228 of the
-unfiltered run.  The mean's smaller count of repeated positions at 30 s
-(7,200) shows the effect depends on the statistic and the window; the table is
-as measured, not tuned for.  On the default track plain CPLS keeps 35,020
-points (barrier relations alone 604), against 43,074 (607) on the raw one.
+Plain CPLS is the expensive one on raw positions.  At 1 km, one trajectory per
+vessel, the barrier relations alone keep 2,457 of the 237,318 points in 163 s
+(2,453 in 117 s with the default 30 s filter, included in the time); all five
+relations on the whole sample did not finish in 10 minutes.  On the first 60
+vessels by MMSI (33,943 positions) the barrier relations alone keep 280 points
+(278 filtered) and all five 19,099 (16,804 filtered).
 
 Hourly series are not changed: a 30 second window holds one observation of an
 hourly station (annotation filters station series with the same step; on the
-sample's 16 stations, 400 observations, none of the wind speed, temperature,
-pressure, humidity or compass-coded wind direction values changes at 30 s, nor
-at one hour).
+sample's 16 stations, none of the 2,302 wind speed, air temperature and air
+pressure observations changes at 30 s).
 
 Corner cutting
 --------------
 
 A centred filter averages across a bend, so it can cut a corner round a
-headland and take a track onto land.  Measured on the sample, against the
-sample coastline (175 land polygons): the raw track has 10 segments that
-intersect land and 2 points on land.  After filtering, no segment crosses land
-that the raw segment between the same two rows did not (0 for the median at 30
-and 60 seconds and the mean at 30 seconds, re-measured with the defaults), and
-no point is moved onto land.  The sample
-has few headlands close to the tracks, so this is no guarantee: measure
-it on yours with :func:`..compression.segment_crossings` on the raw and the
-filtered coordinates.
+headland and take a track onto land.  Measured on the two-day sample, against
+the sample coastline, with the default 30 s median: the filter turns 2 segments
+into land crossings that the raw segment between the same two rows did not
+have (22,666 segments of the raw tracks already intersect the coastline;
+22,662 after filtering), so it is no guarantee against new crossings.  Raw
+points on land are 22,625, and 22,621 after filtering.  Measure it on yours
+with :func:`..compression.segment_crossings` on the raw and the filtered
+coordinates.
 
 References
 ----------
