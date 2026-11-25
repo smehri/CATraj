@@ -15,7 +15,6 @@ from catraj.compression import (
     segment_distances,
 )
 
-from helpers import DATASETS
 
 
 def _walk(n=400, seed=0):
@@ -425,20 +424,27 @@ def test_dtw_of_identical_sequences_is_zero_and_accepts_frames():
 def test_cadp_on_an_annotated_sample_vessel():
     from catraj.annotation import IDW, Spline, annotate_points
 
-    ais = gpd.read_file(DATASETS / "AIS" / "AIS_DLT_UTM.shp")
-    weather = gpd.read_file(DATASETS / "Weather" / "Weather_Observation_UTM.shp")
+    from catraj.datasets import load_ais, load_weather
+
+    ais = load_ais()
+    weather = load_weather()
     stations = pd.DataFrame({
         "x": weather.geometry.x, "y": weather.geometry.y,
-        "t": weather.local_time.astype(float), "value": weather.Ff.astype(float),
+        "t": weather.unix_time.astype(float),
+        "value": weather.wind_speed.astype(float),
     })
-    track = ais[ais.sourcemmsi == ais.sourcemmsi.value_counts().index[1]].sort_values("t")
-    track = track.assign(Ff=annotate_points(
-        stations, track.geometry.x, track.geometry.y, track.t.astype(float),
+    track = ais[ais.mmsi == ais.mmsi.value_counts().index[1]].sort_values("unix_time")
+    track = track.assign(wind_speed=annotate_points(
+        stations, track.geometry.x, track.geometry.y, track.unix_time.astype(float),
         spatial_method=IDW(), temporal_method=Spline()))
 
-    dp = compress(track, 1_000.0, time_column="t")
-    cadp = compress(track, 1_000.0, thresholds={"Ff": 0.2, "speedoverg": 2.0},
-                    time_column="t")
+    # The sample is already median-filtered (30 s), so the default filter_window
+    # would filter it a second time; the test is about CADP, not filtering, and
+    # a second 30 s median is nearly the identity, so the default is kept.
+    dp = compress(track, 1_000.0, time_column="unix_time")
+    cadp = compress(track, 1_000.0,
+                    thresholds={"wind_speed": 0.2, "speed_over_ground": 2.0},
+                    time_column="unix_time")
     assert len(dp) <= len(cadp) < len(track)
     assert set(dp.index) <= set(cadp.index)
     assert dtw(track, cadp) <= dtw(track, dp)

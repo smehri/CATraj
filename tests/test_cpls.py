@@ -14,7 +14,6 @@ from catraj.compression import (
 )
 from catraj.compression.cpls import RULES, _direction_cells, _segments_meet
 
-from helpers import DATASETS
 
 
 _FAR = 1e9
@@ -670,16 +669,17 @@ def test_cpls_compress_movingpandas_objects():
 
 @pytest.mark.data
 def test_cpls_on_the_sample_fleet():
-    ais = gpd.read_file(DATASETS / "AIS" / "AIS_DLT_UTM.shp")
-    ais = ais.sort_values(["sourcemmsi", "t"], kind="stable")
-    land = Barriers(gpd.read_file(DATASETS / "Coastline" / "Coastline_UTM.shp"))
+    from catraj.datasets import load_ais, load_coastline
+
+    ais = load_ais()    # sorted by (mmsi, unix_time)
+    land = Barriers(load_coastline())
     # The barrier relations over the whole fleet; every relation is checked on
     # moving vessels below (moored ones are slow with all of them).
-    out = cpls_compress(ais, 1_000, land, by="sourcemmsi", filter_window=None,
+    out = cpls_compress(ais, 1_000, land, by="mmsi", filter_window=None,
                         **BARRIERS_ONLY)
 
     dp_index, dp_new, cpls_new = [], 0, 0
-    for _, g in ais.groupby("sourcemmsi", sort=False):
+    for _, g in ais.groupby("mmsi", sort=False):
         x, y = g.geometry.x.to_numpy(), g.geometry.y.to_numpy()
         dp = douglas_peucker(x, y, 1_000)
         dp_index.extend(g.index[dp])
@@ -695,13 +695,14 @@ def test_cpls_on_the_sample_fleet():
 
 @pytest.mark.data
 def test_every_relation_on_moving_sample_vessels():
-    ais = gpd.read_file(DATASETS / "AIS" / "AIS_DLT_UTM.shp")
-    ais = ais.sort_values(["sourcemmsi", "t"], kind="stable")
-    land = gpd.read_file(DATASETS / "Coastline" / "Coastline_UTM.shp")
-    moving = ais.groupby("sourcemmsi").speedoverg.median()
+    from catraj.datasets import load_ais, load_coastline
+
+    ais = load_ais()
+    land = load_coastline()
+    moving = ais.groupby("mmsi").speed_over_ground.median()
     moving = moving[(moving > 5) & (moving < 40)].index[:12]
     for mmsi in moving:
-        g = ais[ais.sourcemmsi == mmsi]
+        g = ais[ais.mmsi == mmsi]
         x, y = g.geometry.x.to_numpy(), g.geometry.y.to_numpy()
         sel = cpls_select(x, y, 1_000, land)
         assert (sel.mask >= sel.dp).all()

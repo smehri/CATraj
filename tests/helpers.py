@@ -8,7 +8,7 @@ rather than relatively. pytest puts this folder on ``sys.path``.
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-DATASETS = ROOT / "data" / "sample"
+SAMPLE = ROOT / "data" / "sample" / "preprocessed"
 
 
 def linear_field(x, y, t=0.0):

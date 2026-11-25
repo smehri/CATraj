@@ -17,7 +17,6 @@ from catraj.compression import (
 from catraj.compression.cpls import RULES
 from catraj.compression.two_stage import _nearest, _runs, _speed_dp, _speeds
 
-from helpers import DATASETS
 
 
 _FAR = 1e9
@@ -778,15 +777,16 @@ def test_compress_movingpandas_objects():
 
 @pytest.mark.data
 def test_two_stage_on_the_sample_fleet():
-    ais = gpd.read_file(DATASETS / "AIS" / "AIS_DLT_UTM.shp")
-    ais = ais.sort_values(["sourcemmsi", "t"], kind="stable")
-    land = Barriers(gpd.read_file(DATASETS / "Coastline" / "Coastline_UTM.shp"))
+    from catraj.datasets import load_ais, load_coastline
+
+    ais = load_ais()    # sorted by (mmsi, unix_time)
+    land = Barriers(load_coastline())
     two_stage = 0
-    for _, g in ais.groupby("sourcemmsi", sort=False):
+    for _, g in ais.groupby("mmsi", sort=False):
         x, y = g.geometry.x.to_numpy(), g.geometry.y.to_numpy()
         sel = two_stage_cpls_select(
-            x, y, g.t.to_numpy(float), 1_000, 1.54, land,
-            status=g.navigation.to_numpy(float), stay_radius=100.0,
+            x, y, g.unix_time.to_numpy(float), 1_000, 1.54, land,
+            status=g.navigational_status.to_numpy(float), stay_radius=100.0,
             stay_duration=600.0,
         )
         two_stage += sel.mask.sum()
@@ -795,8 +795,9 @@ def test_two_stage_on_the_sample_fleet():
         # not have.
         assert not segment_crossings(
             sel.x, sel.y, land, keep=sel.mask, new_only=True).any()
-    # Plain CPLS with every relation keeps 43,074 points here (40 s): the
-    # jitter of moored vessels.  With the stays collapsed, under a tenth.
+    # The jitter of moored vessels keeps most points under plain CPLS with
+    # every relation.  With the stays collapsed, under a tenth: measured on
+    # the 2015-11-09/10 sample, 15,674 of 237,318 (6.6 %).
     assert two_stage < len(ais) // 10
 
 

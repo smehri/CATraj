@@ -30,7 +30,6 @@ from __future__ import annotations
 import traceback
 from pathlib import Path
 
-import geopandas as gpd
 import holoviews as hv
 import hvplot.pandas  # noqa: F401  -- registers .hvplot
 import numpy as np
@@ -39,6 +38,7 @@ import panel as pn
 
 ROOT = Path(__file__).resolve().parents[1]
 
+from catraj.datasets import read_points  # noqa: E402
 from catraj.annotation import (  # noqa: E402
     DLT,
     IDW,
@@ -114,7 +114,9 @@ def _notify(message, kind="info"):
 
 
 def _read(path):
-    gdf = gpd.read_file(path)
+    # A shapefile or any other vector file as it is; a .parquet file is a
+    # preprocessed table whose x, y columns (EPSG:32630) become the points.
+    gdf = read_points(path)
     if gdf.crs is None:
         raise ValueError(
             f"{Path(path).name} has no CRS. Interpolation weights distances, so "
@@ -317,16 +319,17 @@ overview_tab = pn.Column(
 # ------------------------------------------------------------ 1. data tab
 
 traj_path = pn.widgets.TextInput(
-    name="Trajectory file", value="data/sample/AIS/AIS_DLT_UTM.shp")
+    name="Trajectory file (.parquet with x, y, or a vector file)",
+    value="data/sample/preprocessed/AIS/ais.parquet")
 station_path = pn.widgets.TextInput(
-    name="Context station file",
-    value="data/sample/Weather/Weather_Observation_UTM.shp")
+    name="Context station file (.parquet with x, y, or a vector file)",
+    value="data/sample/preprocessed/Weather/weather.parquet")
+# The preprocessed columns have readable names, so no description file is
+# needed by default.
 traj_dict_path = pn.widgets.TextInput(
-    name="Trajectory field descriptions (optional)",
-    value="data/sample/AIS/AIS_parameters.txt")
+    name="Trajectory field descriptions (optional)", value="")
 station_dict_path = pn.widgets.TextInput(
-    name="Context field descriptions (optional)",
-    value="data/sample/Weather/Weather_parameters.txt")
+    name="Context field descriptions (optional)", value="")
 load_button = pn.widgets.Button(name="Load", button_type="primary", width=120)
 dictionary_status = pn.Column()
 
@@ -508,8 +511,10 @@ data_tab = pn.Column(
         _note("Field descriptions are <b>optional</b>. Supply them when the "
               "column names are coded rather than meaningful &mdash; "
               "<code>Ff</code> reads as \"Mean wind speed (meters per "
-              "seconds)\" with the weather dictionary, and as "
-              "<code>Ff</code> without it."),
+              "seconds)\" with the archive's raw weather "
+              "<code>README_parameters.txt</code>, and as <code>Ff</code> "
+              "without it. The preprocessed sample's names are already "
+              "readable."),
         dictionary_status,
         _note("Both files need a <b>projected CRS in metres</b>. Interpolation weights "
               "distances, and degrees are not a metric space &mdash; a degree of "

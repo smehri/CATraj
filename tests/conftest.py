@@ -3,7 +3,7 @@
 Everything here is synthetic: a field whose true value is known everywhere, so
 an interpolator's answer can be checked exactly rather than eyeballed.  Tests
 that need the real sample data carry the ``data`` marker and skip when
-``data/sample/`` is absent.
+``data/sample/preprocessed/`` is absent.
 """
 
 import os
@@ -15,7 +15,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from helpers import DATASETS, linear_field  # noqa: E402
+from helpers import SAMPLE, linear_field  # noqa: E402
 
 
 @pytest.fixture
@@ -38,9 +38,10 @@ def station_frame(grid_stations):
 
 
 def pytest_collection_modifyitems(config, items):
-    if DATASETS.exists():
+    if (SAMPLE / "AIS" / "ais.parquet").exists():
         return
-    skip = pytest.mark.skip(reason="sample data in data/sample/ not present")
+    skip = pytest.mark.skip(
+        reason="preprocessed sample in data/sample/preprocessed/ not present")
     for item in items:
         if "data" in item.keywords:
             item.add_marker(skip)

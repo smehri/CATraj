@@ -54,7 +54,7 @@ publisher via the DOI. The implementation does not depend on having them.
 | [`notebooks/`](notebooks/) | the tutorials, in reading order |
 | [`scripts/`](scripts/) | command-line scripts: the data downloader and whole-archive workflows |
 | [`app/`](app/) | the interactive annotation app |
-| [`data/`](data/) | all data: the 24-hour sample in `sample/`, committed; the downloaded archive in `zenodo_1167595/` and built files in `cache/`, not committed |
+| [`data/`](data/) | all data: the two-day sample in `sample/` (raw and preprocessed), committed; the downloaded archive in `zenodo_1167595/` and built files in `cache/`, not committed |
 | `results/` | everything the notebooks, scripts and app write, not committed ([`README`](results/README.md)) |
 | [`docs/`](docs/) | the source papers (open-access ones) and [`getting_the_data.md`](docs/getting_the_data.md) |
 
@@ -152,7 +152,8 @@ clean = denoise(traj, window=60, columns=["speed_over_ground"],
                 time_column="unix_time", by="mmsi")   # seconds; 30 by default
 ```
 
-On the 24-hour sample it takes about 0.25 s, moves the median point by 0.0 m
+On the earlier 24-hour sample (raw, 2016-02-05, 106,894 positions; no longer
+in the repository) it takes about 0.25 s, moves the median point by 0.0 m
 (95th percentile 22 m) at 30 s, and creates no land crossing that the raw track
 did not have there. Filtering the positions alone raises the number of points
 2stage-CPLS keeps (5,228 raw, 12,006 after a 30 s median) because filtered
@@ -195,7 +196,7 @@ projected CRS as the positions:
 ```python
 from catraj.compression import cpls_compress
 
-land = gpd.read_file("data/sample/Coastline/Coastline_UTM.shp")   # land polygons
+land = load_coastline()   # land polygons, from catraj.datasets
 safe = cpls_compress(traj, epsilon=1_000, barriers=land, by="mmsi",
                      time_column="unix_time")
 ```
@@ -208,7 +209,7 @@ nearby barrier on the side it was;
 The self-intersection and inversion relations act on the track alone, and on
 raw AIS they are expensive: the GPS jitter of a moored vessel crosses itself
 thousands of times, and keeping those crossings keeps most of its points. On
-the 24-hour sample at 1 km, the barrier relations alone keep 607 of 106,894
+that sample at 1 km, the barrier relations alone keep 607 of 106,894
 points, all five 43,074 (about 40 s instead of 3 s), without filtering; with
 the default 30 s filter, 604 and 35,020. The paper's two-stage
 CPLS collapses stay points first and removes that jitter (below). Otherwise,
@@ -241,7 +242,7 @@ small = two_stage_cpls_compress(
 
 The result is a row subset of the input, except that the geometry of each
 stay's two kept rows is the centroid; a `stay` column marks them. On the
-24-hour sample (epsilon 1 km, 1.54 m/s, all five relations) status alone finds
+same 24-hour sample (epsilon 1 km, 1.54 m/s, all five relations) status alone finds
 19 stays and keeps 44,369 of 106,894 points, hardly fewer than CPLS, because
 most moored vessels there do not report "at anchor"; adding movement detection
 (100 m, 10 minutes: 98 stays) keeps 5,228 unfiltered (`filter_window=None`) and
@@ -258,9 +259,9 @@ python app/run_app.py       # or double-click app/"Run Annotation App.bat"
 | | |
 |---|---|
 | [`docs/getting_the_data.md`](docs/getting_the_data.md) | how to download the public archive the tutorials use: one command, by hand, checksums, troubleshooting |
-| [`notebooks/01_trajectory_annotation.ipynb`](notebooks/01_trajectory_annotation.ipynb) | annotation on real data, from the 24-hour sample up to the whole six-month archive, with interactive plots |
+| [`notebooks/01_trajectory_annotation.ipynb`](notebooks/01_trajectory_annotation.ipynb) | annotation on real data, from the two-day sample up to the whole six-month archive, with interactive plots |
 | [`notebooks/02_cadp_compression.ipynb`](notebooks/02_cadp_compression.ipynb) | CADP on the paper's data (AIS + WAVEWATCH III sea state, Feb 2016): download links and licences, both modes, the paper's experiments |
-| [`notebooks/03_cpls_compression.ipynb`](notebooks/03_cpls_compression.ipynb) | CPLS on the 24-hour sample and a coastline: where Douglas–Peucker cuts across land, what CPLS adds to prevent it, the choice of ε. No download needed |
+| [`notebooks/03_cpls_compression.ipynb`](notebooks/03_cpls_compression.ipynb) | CPLS on the two-day sample and a coastline: where Douglas–Peucker cuts across land, what CPLS adds to prevent it, the choice of ε. No download needed |
 | [`app/README.md`](app/README.md) | the app |
 | [`scripts/README.md`](scripts/README.md) | scripts that process the whole archive end to end |
 
@@ -274,17 +275,29 @@ it applies.
 
 ### Sample data, included
 
-`data/sample/` holds a matched 24-hour extract that the tutorial and app both use
-out of the box:
+`data/sample/` holds a two-day extract of the archive, 2015-11-09 00:00 to
+2015-11-11 00:00 UTC, in two forms: `raw/` (the archive's own CSV and shapefile
+layout, 60 MB) and `preprocessed/` (Parquet, 9 MB). The tutorials, the app and
+the tests read the preprocessed form with `catraj.datasets`:
 
 | | | |
 |---|---|---|
-| AIS positions | 106,894 across 136 vessels | Naval Academy, France — CC-BY-NC-SA-4.0 |
-| Weather observations | 16 coastal stations, hourly | rp5.ua / Met Office / NOAA |
-| Coastline | 175 land polygons, clipped to the AIS area | European Environment Agency — free to re-use, acknowledge the source |
+| AIS positions | 237,318 across 565 vessels, median-filtered (30 s) | Naval Academy, France — CC-BY-NC-SA-4.0 |
+| Weather observations | 16 coastal stations, hourly (768) | rp5.ua / Met Office / NOAA |
+| Sea state | 677,736 grid-cell rows, 3-hourly | SHOM – IFREMER, WAVEWATCH III — cite Boudière et al., 2013 |
+| Coastline | 729 land polygons, clipped to the AIS area | European Environment Agency — free to re-use, acknowledge the source |
 
-AIS and weather cover 2016-02-05 01:00 → 2016-02-06 01:00 UTC; all three layers
-are projected to UTM zone 30N.
+```python
+from catraj.datasets import load_ais, load_weather, load_ocean, load_coastline
+
+ais = load_ais()    # GeoDataFrame in EPSG:32630; unix_time, mmsi, ...
+```
+
+`scripts/make_sample.py` cut `raw/` from the full archive and
+`scripts/prepare_zenodo.py` (that is, `catraj.preprocessing.preprocess_archive`)
+made `preprocessed/`; the same call on the whole archive writes
+`data/zenodo_1167595/preprocessed/` (not committed), which the loaders also read
+(`load_ais("data/zenodo_1167595/preprocessed")`).
 
 **These carry their own licences**, stricter than the code's — the AIS
 extract is CC BY-NC-SA 4.0, so no commercial use. The coastline (EEA) may be

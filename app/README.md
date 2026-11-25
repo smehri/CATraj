@@ -47,7 +47,11 @@ panel serve app/annotation_app.py --show
 
 ## A first run
 
-1. **Data** — the sample paths are pre-filled. Click **Load**.
+1. **Data** — the paths are pre-filled with the committed preprocessed sample
+   (`data/sample/preprocessed/AIS/ais.parquet` and `Weather/weather.parquet`,
+   2015-11-09 and 10). Click **Load**. A `.parquet` file needs `x` and `y`
+   columns in EPSG:32630; any other vector file (shapefile, GeoPackage) is read
+   as it is, and needs its own projected CRS.
 2. **Spatial** — pick a variable, choose methods, **Run cross-validation**.
 3. **Temporal** — same, for the temporal stage.
 4. **Annotate** — the recommendation table shows each variable's winner. Run,
@@ -59,9 +63,11 @@ methods suit your data, there is no reason to spend the time.
 
 ## Field descriptions are optional
 
-Column names like `Ff` and `id_windDir` say nothing on their own. Point the two
-optional inputs on the Data tab at a description file and they become
-`Ff — Mean wind speed (meters per seconds)` throughout the app.
+The preprocessed sample's column names are readable and need no description.
+Column names like `Ff` and `id_windDir` (the archive's raw weather files) say
+nothing on their own. Point the two optional inputs on the Data tab at a
+description file and they become `Ff — Mean wind speed (meters per seconds)`
+throughout the app.
 
 The format is the one used by the sample archives:
 

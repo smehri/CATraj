@@ -2,7 +2,7 @@ import pytest
 
 from catraj.annotation import describe_columns, parse_data_dictionary
 
-from helpers import DATASETS
+from helpers import SAMPLE
 
 DICTIONARY = """\
 Attribute       Data type           Description
@@ -49,5 +49,7 @@ def test_unreadable_file_is_an_empty_mapping(tmp_path):
 
 @pytest.mark.data
 def test_sample_weather_dictionary():
-    fields = parse_data_dictionary(DATASETS / "Weather" / "Weather_parameters.txt")
+    # The sample's raw folder keeps the archive's own README_parameters.txt.
+    fields = parse_data_dictionary(
+        SAMPLE.parent / "raw" / "E2_Weather_Conditions" / "README_parameters.txt")
     assert {"Ff", "T", "Td"} <= set(fields)

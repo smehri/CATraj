@@ -4,10 +4,10 @@
 data in this folder comes from third parties and carries its own terms, which
 are stricter. Read them before redistributing or using this data.
 
-This file covers the sample committed in `sample/`. Each dataset's own
-parameter file (`AIS_parameters.txt`, `Weather_parameters.txt`,
-`Coastline_parameters.txt`) carries the
-full field descriptions and provenance.
+This file covers the sample committed in `sample/`, in both forms: `raw/` (the
+archive's own files, cut to a window) and `preprocessed/` (derived from it).
+The terms below apply to both. The archive's own `README_parameters.txt` files,
+copied into `sample/raw/`, carry the full field descriptions and provenance.
 
 The full archive you download into `zenodo_1167595/` comes from the same
 source under the same terms, plus the sea state data. Its licences are listed
@@ -16,7 +16,7 @@ in section 7 of
 
 ---
 
-## AIS — `sample/AIS/`
+## AIS — `sample/raw/P1_AIS_*`, `sample/preprocessed/AIS/`
 
 Vessel positions from the Automatic Identification System.
 
@@ -26,7 +26,7 @@ Vessel positions from the Automatic Identification System.
 | Licence | **[CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/)** |
 | Coverage | Longitude −10.00 to 0.00, latitude 45.00 to 51.00 |
 | Full dataset | 18,648,556 decoded dynamic messages, 2015-10-01 to 2016-03-31 UTC |
-| Extract here | 106,894 positions, 2016-02-05 01:00 to 2016-02-06 01:00 UTC |
+| Extract here | 239,075 messages (237,318 positions once preprocessed), 565 vessels, 2015-11-09 00:00 to 2015-11-11 00:00 UTC |
 
 **CC BY-NC-SA 4.0 means three things you must observe:**
 
@@ -38,7 +38,7 @@ Vessel positions from the Automatic Identification System.
 
 ---
 
-## Weather — `sample/Weather/`
+## Weather — `sample/raw/E2_Weather_Conditions/`, `sample/preprocessed/Weather/`
 
 Coastal weather observations.
 
@@ -48,18 +48,27 @@ Coastal weather observations.
 | Licence | Public — **cite the source** |
 | Coverage | 16 stations, longitude −10.00 to 0.00, latitude 45.00 to 51.00 |
 | Full dataset | ~75,000 hourly observations, 2015-10-01 to 2016-03-31 UTC |
-| Extract here | 400 observations, 2016-02-05 01:00 to 2016-02-06 01:00 UTC |
+| Extract here | 768 hourly observations at the 16 stations, 2015-11-09 00:00 to 2015-11-11 00:00 UTC |
 
-`Weather_Observation_UTM.shp` keeps the archive's wind-direction code
-(`id_windDir`). `weather_observations.csv` is a longer, decoded table
-(71,134 rows, from the archive's `table_wheatherObservation.csv`): `Wind_Dir`
-is in degrees, `(code - 1) * 22.5` from the archive's `table_windDirection.csv`,
-and the archive's missing value (-65536) and the codes that are not directions
-(17 calm, 18 variable, 19 no data) are written as empty fields.
+`preprocessed/Weather/weather.parquet` keeps the archive's wind-direction code
+(`wind_direction_code`; the archive's `table_windDirection.csv` maps it to a
+compass point). The archive's missing value (-65536) is NaN there.
 
 ---
 
-## Coastline — `sample/Coastline/`
+## Sea state — `sample/raw/E1_ocean/`, `sample/preprocessed/Ocean/`
+
+Wave and sea-level forecast on a grid (WAVEWATCH III).
+
+| | |
+|---|---|
+| Source | SHOM – IFREMER, WAVEWATCH III; Boudière et al., 2013, [doi:10.1016/j.ijome.2013.11.010](https://doi.org/10.1016/j.ijome.2013.11.010) |
+| Licence | Public — **cite Boudière et al., 2013** |
+| Extract here | `oc_november.csv` for 2015-11-09 to 2015-11-11 plus one 3-hour step on each side, in the AIS box plus 0.2 degrees; 677,736 rows once preprocessed |
+
+---
+
+## Coastline — `sample/raw/C2_European_Coastline/`, `sample/preprocessed/Coastline/`
 
 Land polygons, used as barriers by CPLS compression.
 
@@ -69,7 +78,7 @@ Land polygons, used as barriers by CPLS compression.
 | Licence | **EEA standard re-use policy**: re-use for commercial or non-commercial purposes is permitted free of charge, **provided the source is acknowledged**. Copyright holder: Directorate-General for Environment (DG ENV). See <http://www.eea.europa.eu/legal/copyright> |
 | Coverage | Europe |
 | Full dataset | 71,514 land polygons (`Europe Coastline (Polygone).shp`, EPSG:3035) |
-| Extract here | 175 polygons, 12,049 vertices, clipped to the sample AIS area plus 5 km and reprojected to EPSG:32630 |
+| Extract here | clipped to the sample AIS box plus 0.2 degrees; 729 polygons once preprocessed (GeoParquet, EPSG:32630) |
 
 The rule here is attribution only: this layer is not under the AIS licence,
 and the NC and SA terms above do not apply to it.

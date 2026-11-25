@@ -17,7 +17,6 @@ from catraj.prediction.clstm import (
 )
 from catraj.prediction.curvilinear import KNOT, curvilinear_predict
 
-from helpers import DATASETS
 
 
 # ------------------------------------------------------------- fixtures
@@ -593,16 +592,18 @@ def test_import_does_not_need_torch():
 @pytest.mark.torch
 def test_clstm_runs_on_the_sample_fleet():
     pytest.importorskip("torch")
-    ais = gpd.read_file(DATASETS / "AIS" / "AIS_DLT_UTM.shp")
-    ais = ais.sort_values(["sourcemmsi", "t"], kind="stable")
-    land = gpd.read_file(DATASETS / "Coastline" / "Coastline_UTM.shp")
+    from catraj.datasets import load_ais, load_coastline
+
+    ais = load_ais()    # sorted by (mmsi, unix_time)
+    land = load_coastline()
     small = two_stage_cpls_compress(
-        ais, 1_000, 1.54, land, status_column="navigation", stay_radius=100,
-        stay_duration=600, time_column="t", by="sourcemmsi",
+        ais, 1_000, 1.54, land, status_column="navigational_status",
+        stay_radius=100, stay_duration=600, time_column="unix_time", by="mmsi",
     )
     samples = make_samples(
-        small, speed_column="speedoverg", course_column="courseover",
-        context_column="vesselType", time_column="t", by="sourcemmsi",
+        small, speed_column="speed_over_ground",
+        course_column="course_over_ground", context_column="vessel_type",
+        time_column="unix_time", by="mmsi",
     )
     train, test = split_by_trajectory(samples)
     fitted = ClstmPredictor(max_epochs=3, min_samples=50, device="cpu").fit(train)

@@ -72,7 +72,7 @@ catraj = ["py.typed"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 markers = [
-    "data: needs the sample datasets in data/sample/",
+    "data: needs the preprocessed sample in data/sample/preprocessed/",
     "movingpandas: needs the optional movingpandas dependency",
     "torch: needs the optional PyTorch dependency",
 ]

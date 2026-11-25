@@ -1,7 +1,7 @@
 # Getting the data
 
 This page shows how to get every dataset the tutorials and workflows
-use. Read it before you run anything beyond the 24-hour sample.
+use. Read it before you run anything beyond the two-day sample.
 
 **In short.** Run this from the repository root:
 
@@ -14,8 +14,8 @@ checksum, and extracts what the code reads into `data/zenodo_1167595/`.
 Running it again is safe: an interrupted download resumes, and files already
 in place are skipped.
 
-Then prepare the files the notebooks read (renames the coded columns, removes
-noise; section 5, step 0):
+Then preprocess the files the notebooks read (renames the coded columns, checks
+ranges, projects to EPSG:32630, removes noise; section 5, step 0):
 
 ```bash
 python scripts/prepare_zenodo.py
@@ -27,9 +27,9 @@ python scripts/prepare_zenodo.py
 
 | you want to run | data it needs | download |
 |---|---|---|
-| `notebooks/01_trajectory_annotation.ipynb` with the 24-hour sample (`SOURCE = "sample"`) | `data/sample/`, **already in the repository** | none |
-| `app/` (the annotation app) | `data/sample/`, already in the repository | none |
-| `notebooks/03_cpls_compression.ipynb` | `data/sample/` (AIS and coastline), already in the repository | none |
+| `notebooks/01_trajectory_annotation.ipynb` with the two-day sample (`SOURCE = "sample"`) | `data/sample/preprocessed/`, **already in the repository** | none |
+| `app/` (the annotation app) | `data/sample/preprocessed/`, already in the repository | none |
+| `notebooks/03_cpls_compression.ipynb` | `data/sample/preprocessed/` (AIS and coastline), already in the repository | none |
 | `notebooks/01_trajectory_annotation.ipynb` with the full archive (`SOURCE = "zenodo"`) | AIS data, AIS codes, weather | `download_data.py annotation` (~203 MB) |
 | `notebooks/02_cadp_compression.ipynb` | AIS data, ocean conditions | `download_data.py cadp` (~771 MB) |
 | `scripts/cadp_on_annotated_fleet.py` | the annotated fleet that tutorial 1 writes (section 5 below) | `download_data.py annotation` |
@@ -37,8 +37,25 @@ python scripts/prepare_zenodo.py
 
 With `SOURCE = "auto"`, the default, tutorial 1 uses the full archive if it has
 been downloaded and the sample otherwise. So it runs either way. The full
-archive must also have been prepared with `scripts/prepare_zenodo.py` (section 5):
-the notebooks read its cleaned files in `clean/`, not the raw CSVs.
+archive must also have been preprocessed with `scripts/prepare_zenodo.py`
+(section 5): the notebooks read its files in `preprocessed/`, not the raw CSVs.
+
+### The sample, raw and preprocessed
+
+`data/sample/` holds the same archive cut to two days, 2015-11-09 00:00 to
+2015-11-11 00:00 UTC, in two forms (60 MB and 9 MB). `data/sample/raw/` mirrors
+the archive's own folders, file names and CSV layout: 239,075 AIS messages of
+565 vessels, the 16 weather stations hourly, one month of sea state
+(`oc_november.csv`, the window plus one 3 h step each side), and the coastline
+clipped to the AIS area. `data/sample/preprocessed/` is what
+`catraj.preprocessing.preprocess_archive` makes of it, with the same layout
+the full archive gets in `data/zenodo_1167595/preprocessed/`:
+`AIS/ais.parquet`, `Weather/weather.parquet`, `Ocean/ocean_november.parquet`,
+`Coastline/coastline.parquet` and `preprocessing_report.csv`/`.txt`. It was cut
+by `scripts/make_sample.py` (which needs this download) and preprocessed with
+`scripts/prepare_zenodo.py --data data/sample/raw --out data/sample/preprocessed`.
+Read either with `catraj.datasets` (`load_ais`, `load_weather`, `load_ocean`,
+`load_coastline`; pass the full archive's `preprocessed` folder as `root`).
 
 ---
 
@@ -173,11 +190,11 @@ or if you want a download manager.
 
 Paths are relative to the repository root. The code looks only here, and git
 ignores everything in `data/` except its README, its LICENSE and the
-committed 24-hour sample in `sample/`.
+committed two-day sample in `sample/`.
 
 ```
 data/
-├── sample/                           the sample (AIS, Weather, Coastline), committed (not used here)
+├── sample/                           the two-day sample, raw/ and preprocessed/, committed (not used here)
 ├── cache/                            files the scripts build
 └── zenodo_1167595/
     ├── P1_AIS_Data/
@@ -196,10 +213,12 @@ data/
     ├── C2_European_Coastline/
     │   ├── Europe Coastline (Polygone).shp   (+ .shx .dbf .prj)  land polygons   tutorial 3 (optional section)
     │   └── README_parameters.txt
-    └── clean/                        written by scripts/prepare_zenodo.py (section 5)
-        ├── ais_dynamic.parquet       AIS, descriptive names, filtered     tutorials 1, 2
-        ├── ocean_february.parquet    sea state per month (ocean_<month>)  tutorial 2
-        └── weather.parquet           observations + station positions     tutorial 1
+    └── preprocessed/                 written by scripts/prepare_zenodo.py (section 5); not committed
+        ├── AIS/ais.parquet           AIS, descriptive names, filtered     tutorials 1, 2
+        ├── Ocean/ocean_<month>.parquet  sea state, one file per month     tutorial 2
+        ├── Weather/weather.parquet   observations + station positions     tutorial 1
+        ├── Coastline/coastline.parquet  land polygons, EPSG:32630         tutorial 3
+        └── preprocessing_report.csv, .txt
 ```
 
 ---
@@ -208,10 +227,10 @@ data/
 
 | step | command | reads | writes |
 |---|---|---|---|
-| 0 | `python scripts/prepare_zenodo.py` (needs `pyarrow`) | the raw CSVs from the download | `data/zenodo_1167595/clean/*.parquet`: columns renamed, "not available" codes as NaN, noise removed |
-| 1 | open `notebooks/01_trajectory_annotation.ipynb`, keep `SOURCE = "auto"` (or `"zenodo"`), run all | `clean/ais_dynamic.parquet`, `clean/weather.parquet`, the README files | `results/01_trajectory_annotation/`, including `06_fleet_annotated.parquet` (~1 GB) when `EXPORT_FLEET = True` |
+| 0 | `python scripts/prepare_zenodo.py` (needs `pyarrow`) | the raw CSVs from the download | `data/zenodo_1167595/preprocessed/`: columns renamed, "not available" codes as NaN, ranges checked, projected to EPSG:32630, noise removed |
+| 1 | open `notebooks/01_trajectory_annotation.ipynb`, keep `SOURCE = "auto"` (or `"zenodo"`), run all | `preprocessed/AIS/ais.parquet`, `preprocessed/Weather/weather.parquet` | `results/01_trajectory_annotation/`, including `06_fleet_annotated.parquet` (~1 GB) when `EXPORT_FLEET = True` |
 | 2 | `python scripts/cadp_on_annotated_fleet.py` | `06_fleet_annotated.parquet` from step 1 | `results/02_cadp_compression/` |
-| 3 | open `notebooks/02_cadp_compression.ipynb`, run all | `clean/ais_dynamic.parquet`, `clean/ocean_february.parquet` | figures and tables inline |
+| 3 | open `notebooks/02_cadp_compression.ipynb`, run all | `preprocessed/AIS/ais.parquet`, `preprocessed/Ocean/ocean_february.parquet` | figures and tables inline |
 
 Steps 1 and 3 depend on step 0; step 2 depends on step 1.
 
@@ -237,7 +256,7 @@ exported.
 | `checksum mismatch` | the archive was deleted; run again to download it afresh. If it happens again, download it by hand (3 C) |
 | very slow, or blocked by a firewall | the script honours the `HTTPS_PROXY` environment variable; otherwise download by hand with a browser or a download manager (3 C) |
 | Zenodo returns an error, e.g. 429 *Too Many Requests* or 5xx | wait a few minutes and run the script again |
-| a notebook says the cleaned files are missing | run `python scripts/prepare_zenodo.py` (after the download) |
+| a notebook says the preprocessed files are missing | run `python scripts/prepare_zenodo.py` (after the download) |
 | `prepare_zenodo.py` says pyarrow is needed | `pip install pyarrow` (or `pip install -e .[data]`) |
 | a notebook raises `FileNotFoundError: missing: data/...` | the file is not where section 4 says; run `python scripts/download_data.py --check` |
 | `scripts/cadp_on_annotated_fleet.py` says the Parquet file is missing | run tutorial 1 with the full archive and `EXPORT_FLEET = True` first (section 5) |
@@ -269,5 +288,5 @@ terms.
   <http://www.eea.europa.eu/legal/copyright>
 
 If you publish work that uses this data, cite Ray et al. (2019) above as well.
-The sample in `data/sample/` (24 hours of AIS and weather, and the clipped
-coastline) is cut from the same archive, under the same terms ([`data/LICENSE.md`](../data/LICENSE.md)).
+The sample in `data/sample/` (two days of AIS, weather and sea state, and the
+clipped coastline) is cut from the same archive, under the same terms ([`data/LICENSE.md`](../data/LICENSE.md)).

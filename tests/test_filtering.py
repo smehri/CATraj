@@ -5,7 +5,6 @@ import pytest
 
 from catraj.preprocessing import denoise, rolling_filter
 
-from helpers import DATASETS
 
 
 # ------------------------------------------------------------- references
@@ -304,19 +303,22 @@ def test_denoise_a_movingpandas_collection():
 
 @pytest.mark.data
 def test_denoise_on_the_sample_fleet():
-    ais = gpd.read_file(DATASETS / "AIS" / "AIS_DLT_UTM.shp")
-    ais = ais.sort_values(["sourcemmsi", "t"], kind="stable")
-    ais["speedoverg"] = ais["speedoverg"].where(ais["speedoverg"] < 102.2)
+    from catraj.datasets import load_ais
+
+    ais = load_ais()    # sorted by (mmsi, unix_time); already 30 s filtered
+    ais["speed_over_ground"] = ais["speed_over_ground"].where(
+        ais["speed_over_ground"] < 102.2)
     for method in ("median", "mean"):
-        out = denoise(ais, 60.0, method=method, columns=["speedoverg"],
-                      time_column="t", by="sourcemmsi")
+        out = denoise(ais, 60.0, method=method, columns=["speed_over_ground"],
+                      time_column="unix_time", by="mmsi")
         assert len(out) == len(ais)
         assert out.index.equals(ais.index)
         assert out.crs == ais.crs
         assert np.isfinite(out.geometry.x).all()
         assert np.isfinite(out.geometry.y).all()
-        assert out["speedoverg"].isna().sum() == ais["speedoverg"].isna().sum()
-        pd.testing.assert_series_equal(out["t"], ais["t"])
+        assert (out["speed_over_ground"].isna().sum()
+                == ais["speed_over_ground"].isna().sum())
+        pd.testing.assert_series_equal(out["unix_time"], ais["unix_time"])
 
 
 # ------------------------------------------------ bearings and the default
