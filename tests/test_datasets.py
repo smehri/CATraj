@@ -83,3 +83,51 @@ def test_dataset_argument():
         sample_root("mars")
     with pytest.raises(ValueError, match="dataset"):
         full_root("mars")
+
+
+# ----------------------------------------------------------------- US data
+
+
+def _us_root(tmp_path):
+    ais = tmp_path / "AIS"
+    ais.mkdir()
+    for month, mmsi, t in (("2017-11", [2, 1], [5, 9]), ("2017-12", [1, 2], [3, 4])):
+        pd.DataFrame({"mmsi": mmsi, "unix_time": t, "x": [1.0, 2.0], "y": [3.0, 4.0],
+                      "vessel_group": ["Tug", "Cargo"]}).to_parquet(ais / f"ais_{month}.parquet")
+    return tmp_path
+
+
+def test_load_ais_us_concatenates_the_months(tmp_path):
+    ais = load_ais(_us_root(tmp_path), dataset="us")
+    assert ais.crs.to_epsg() == 32618 and len(ais) == 4
+    assert list(zip(ais.mmsi, ais.unix_time)) == [(1, 3), (1, 9), (2, 4), (2, 5)]
+    assert (ais.geometry.x == ais.x).all()
+
+
+def test_load_ais_us_months_and_columns(tmp_path):
+    root = _us_root(tmp_path)
+    nov = load_ais(root, dataset="us", months=["2017-11"], columns=["mmsi"])
+    assert len(nov) == 2 and set(nov.columns) == {"mmsi", "x", "y", "geometry"}
+    with pytest.raises(FileNotFoundError, match="2018-01"):
+        load_ais(root, dataset="us", months=["2018-01"])
+    with pytest.raises(ValueError, match="months"):
+        load_ais(root, months=["2017-11"])
+    with pytest.raises(FileNotFoundError):
+        load_ais(tmp_path / "empty", dataset="us")
+
+
+def test_us_coastline_name(tmp_path):
+    (tmp_path / "Coastline").mkdir()
+    gpd.GeoDataFrame(geometry=gpd.GeoSeries.from_wkt(["POLYGON((0 0,1 0,1 1,0 0))"]),
+                     crs=32618).to_parquet(tmp_path / "Coastline" / "shoreline.parquet")
+    assert load_coastline(tmp_path, dataset="us").crs.to_epsg() == 32618
+    with pytest.raises(FileNotFoundError):
+        load_coastline(tmp_path)  # Zenodo expects coastline.parquet
+
+
+def test_us_sample_data():
+    assert sample_root("us") == repo_root() / "data" / "UsAIS" / "sample" / "preprocessed"
+    ais = load_ais(dataset="us")
+    assert ais.crs.to_epsg() == 32618 and len(ais) > 0
+    assert {"mmsi", "unix_time", "course_over_ground_grid", "vessel_group"} <= set(ais.columns)
+    assert load_coastline(dataset="us").crs.to_epsg() == 32618

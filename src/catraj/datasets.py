@@ -24,10 +24,24 @@ __all__ = [
     "load_coastline", "read_points", "CRS",
 ]
 
-#: The projected CRS the preprocessed ``x`` and ``y`` are in (UTM zone 30N).
+#: The projected CRS of the Zenodo (Brest) data, UTM zone 30N.  The US data is in
+#: EPSG:32618; the loaders take the CRS of their ``dataset`` from
+#: :func:`catraj.preprocessing.get_dataset`.
 CRS = "EPSG:32630"
 
 _FOLDERS = {"zenodo": "ZenodoData", "us": "UsAIS"}
+_COASTLINE = {"zenodo": "coastline.parquet", "us": "shoreline.parquet"}
+
+
+def _spec(dataset):
+    _folder(dataset)  # the same error for an unknown dataset everywhere
+    from .preprocessing.datasets_spec import get_dataset  # lazy: pulls in the preprocessing
+
+    return get_dataset(dataset)
+
+
+def _crs(dataset) -> str:
+    return f"EPSG:{_spec(dataset).crs}"
 
 
 def _folder(dataset: str) -> Path:
@@ -120,21 +134,46 @@ def read_points(path, crs=CRS):
     return gpd.read_file(path)
 
 
-def load_ais(root=None, columns=None, dataset="zenodo"):
-    """The preprocessed AIS as a GeoDataFrame in EPSG:32630.
+def load_ais(root=None, columns=None, dataset="zenodo", months=None):
+    """The preprocessed AIS as a GeoDataFrame in the dataset's projected CRS.
 
-    Columns are those of ``ais.parquet`` (``mmsi``, ``unix_time`` in seconds
-    since 1970 as an integer, ``speed_over_ground``, ``course_over_ground``,
-    ``true_heading``, ``navigational_status``, ``rate_of_turn``, ``lon``,
-    ``lat``, ``x``, ``y``, ``ship_type_code``, ``vessel_type``); the geometry
-    is ``(x, y)``. Rows are sorted by ``(mmsi, unix_time)``, with a fresh
-    index. ``columns`` limits the columns read (``x`` and ``y`` are kept).
-    ``root=None`` reads the committed sample of ``dataset`` ("zenodo" or "us").
+    The CRS and the files come from ``get_dataset(dataset)``: EPSG:32630 and
+    ``AIS/ais.parquet`` for ``"zenodo"``; EPSG:32618 and one file per month,
+    ``AIS/ais_<YYYY-MM>.parquet``, for ``"us"``, concatenated.  ``months`` (US
+    only), for instance ``["2017-11"]``, reads those months; ``None`` reads
+    every month found.
+
+    Columns are those of the files (``mmsi``, ``unix_time`` in seconds since
+    1970 as an integer, ``speed_over_ground``, ``course_over_ground``,
+    ``navigational_status``, ``lon``, ``lat``, ``x``, ``y``, ``vessel_type``, ...);
+    the geometry is ``(x, y)``. Rows are sorted by ``(mmsi, unix_time)``, with a
+    fresh index. ``columns`` limits the columns read (``x`` and ``y`` are kept).
+    ``root=None`` reads the committed sample of ``dataset``.
     """
-    path = _file(root, "AIS", "ais.parquet", dataset=dataset)
+    spec = _spec(dataset)
+    base = sample_root(dataset) if root is None else Path(root)
+    files = [f for f in spec.ais_outputs(base) if f.is_file()]
+    if months is not None:
+        if dataset == "zenodo":
+            raise ValueError("months is only for datasets with one AIS file per month")
+        wanted = {str(m) for m in months}
+        files = [f for f in files if f.stem.removeprefix("ais_") in wanted]
+        missing = wanted - {f.stem.removeprefix("ais_") for f in files}
+        if missing:
+            raise FileNotFoundError(
+                f"no AIS file for month(s) {sorted(missing)} under {base / 'AIS'}")
+    if not files:
+        raise FileNotFoundError(
+            f"no AIS file found under {base / 'AIS'}. {base} should be a folder written by "
+            "catraj.preprocessing.preprocess_archive (for the full archive, "
+            "run scripts/prepare_zenodo.py first).")
     if columns is not None:
         columns = list(dict.fromkeys([*columns, "x", "y"]))
-    return _points(pd.read_parquet(path, columns=columns))
+    frames = [pd.read_parquet(f, columns=columns) for f in files]
+    df = frames[0] if len(frames) == 1 else pd.concat(frames, ignore_index=True)
+    if len(frames) > 1 and {"mmsi", "unix_time"} <= set(df.columns):
+        df = df.sort_values(["mmsi", "unix_time"], kind="stable", ignore_index=True)
+    return _points(df, _crs(dataset))
 
 
 def load_weather(root=None, dataset="zenodo"):
@@ -143,7 +182,8 @@ def load_weather(root=None, dataset="zenodo"):
     One row per station and hour (``station_id``, ``unix_time``,
     ``air_temperature``, ``wind_speed``, ... ``x``, ``y``).
     """
-    return _points(pd.read_parquet(_file(root, "Weather", "weather.parquet", dataset=dataset)))
+    return _points(pd.read_parquet(_file(root, "Weather", "weather.parquet", dataset=dataset)),
+                   _crs(dataset))
 
 
 def load_ocean(root=None, month="november", dataset="zenodo"):
@@ -162,7 +202,12 @@ def load_ocean(root=None, month="november", dataset="zenodo"):
 
 
 def load_coastline(root=None, dataset="zenodo"):
-    """The land polygons as a GeoDataFrame in EPSG:32630 (GeoParquet)."""
+    """The land polygons as a GeoDataFrame (GeoParquet) in the dataset's CRS.
+
+    ``Coastline/coastline.parquet`` (EPSG:32630) for ``"zenodo"``,
+    ``Coastline/shoreline.parquet`` (EPSG:32618, NOAA shoreline) for ``"us"``.
+    """
     import geopandas as gpd
 
-    return gpd.read_parquet(_file(root, "Coastline", "coastline.parquet", dataset=dataset))
+    _folder(dataset)
+    return gpd.read_parquet(_file(root, "Coastline", _COASTLINE[dataset], dataset=dataset))
